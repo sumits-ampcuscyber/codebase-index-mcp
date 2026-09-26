@@ -1,0 +1,41 @@
+---
+description: Use the codebase-index MCP tools before reading whole files; delegate multi-file exploration to the codebase-explorer subagent
+alwaysApply: true
+---
+
+# Codebase index first, whole files last
+
+This workspace has a local **codebase-index** MCP server (tree-sitter + SQLite). Its answers cost a few
+hundred tokens; opening a large file costs thousands and stays in context for the rest of the chat.
+
+## Routing
+
+| Question | Do this |
+|---|---|
+| Unfamiliar repo, "where do things live?" | `repo_map` (or `repo_map path=<folder>`) |
+| Where is X defined? | `search_symbol` (`Class.method`, `Class.` for members, `two words`, comma-separate several) |
+| What is in this file? | `get_file_summary` (outline + docstrings) or `get_exports` |
+| Show me X's code | `read_symbol_source symbol=X` (several: `a, B.c`). Huge symbols return a folded skeleton; read folded ranges with `line_start`/`line_end` |
+| Who calls X / impact of changing X | `find_callers` (`depth=2` for callers of callers; `receiver=` to filter) |
+| What does X call? | `find_callees` |
+| Who depends on this file? | `who_imports` |
+| Which handler serves `/api/...`? | `find_route` |
+| What does ONE file do (intent)? | `summarize_file` only if an API key is configured; after a "no API key" error, stop calling it |
+| How does a feature work end to end, across several files? | Delegate to the **codebase-explorer** subagent (below) |
+
+## Rules
+
+1. Call the index tools **before** Read/Grep on source files. Do not open a whole file just to find one
+   function; use `read_symbol_source`.
+2. Open a whole file only when you are about to edit most of it.
+3. `find_callers` matches by **name**. When it warns about several definitions, check the receiver and
+   files before refactoring.
+4. Markdown, SQL, YAML, JSON and other non-code files are not indexed; read them normally.
+5. Save files before asking questions about them: unsaved editor buffers are not indexed.
+
+## Subagent for multi-file exploration
+
+For "how does X work end to end", "trace this flow", or any question that needs more than two or three
+files, hand it to the `codebase-explorer` subagent (`.cursor/agents/codebase-explorer.md`). It runs on a
+fast, cheap model (Grok 4.7 by default; change it with `python setup_cursor.py --model <id>`), uses the
+same index tools, and returns a short written answer, so the raw source never enters this chat.
