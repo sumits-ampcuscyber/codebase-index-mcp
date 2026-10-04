@@ -11,7 +11,7 @@ First file that sets a variable wins:
 2. `.env` in the project folder (only when running from a git clone or editable install)
 3. `~/.codebase-index.env` (best place for API keys when installed with pipx/pip)
 
-Copy [`.env.example`](../.env.example) as a starting point. Lines look like `KEY=value`; `#` starts a comment;
+Copy [`.env.example`](../../.env.example) as a starting point. Lines look like `KEY=value`; `#` starts a comment;
 empty values are ignored.
 
 ## Variables

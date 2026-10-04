@@ -21,10 +21,10 @@ src/codebase_index/   indexer.py (parse + store)  queries.py (answers)  server.p
                       cli.py  clients.py (setup)  doctor.py  bench.py  hooks.py  config.py
                       templates/ (rule, instruction and subagent files that `setup` installs)
 tests/                end-to-end tests on a synthetic repo, and setup/template tests
-docs/                 user and platform guides; how-it-works
+docs/                 user-guide/ (use it), concepts/ (understand it), reference/, developers/
 ```
 
-See [docs/how-it-works.md](docs/how-it-works.md) for the architecture and [docs/extending.md](docs/extending.md)
+See [docs/concepts/how-it-works.md](docs/concepts/how-it-works.md) for the architecture and [docs/developers/extending.md](docs/developers/extending.md)
 for adding a language or a client.
 
 ## Guidelines

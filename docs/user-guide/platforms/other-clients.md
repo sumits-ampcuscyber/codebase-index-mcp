@@ -39,7 +39,7 @@ only parts that matter are **command**, **args** and **env**.
 The server sends routing instructions when it connects, which many clients show to the model. For clients
 that do not, or for stronger steering, add the short rule to the client's instruction file
 (`GEMINI.md`, `.windsurfrules`, `.clinerules`, `AGENTS.md`, …). The text is in
-[`src/codebase_index/templates/instructions.md`](../../src/codebase_index/templates/instructions.md) and is
+[`src/codebase_index/templates/instructions.md`](../../../src/codebase_index/templates/instructions.md) and is
 about 200 tokens.
 
 ## Requirements for a client

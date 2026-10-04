@@ -3,6 +3,16 @@
 **First step, always:** run `codebase-index doctor` in your repo. It checks Python and dependencies, the
 repo root, the index, and whether each client's config points at a Python that exists.
 
+## Install problems
+
+| Symptom | Fix |
+|---|---|
+| `codebase-index: command not found` | Close and reopen the terminal. If still missing, run `python -m pipx ensurepath` and reopen again. On Windows, check that Python's `Scripts` folder is on PATH |
+| `pipx: command not found` | `python -m pip install --user pipx`, then `python -m pipx ensurepath`, then reopen the terminal |
+| `python` not found / version too old | Install Python 3.10+ from python.org (Windows: tick "Add Python to PATH"). On macOS/Linux try `python3` |
+| pipx cannot download from GitHub | Check network/proxy and that the repository is public or you are logged in to git. Alternative: [install from a clone](install.md#from-a-clone-development-or-vendoring-into-a-repo) |
+| Build errors for tree-sitter | Use Python 3.10-3.13 (prebuilt wheels exist); upgrade pip: `python -m pip install -U pip` |
+
 ## Connection and setup
 
 | Symptom | Likely cause → fix |
@@ -22,7 +32,7 @@ repo root, the index, and whether each client's config points at a Python that e
 | "not in the index" | Unsupported extension, git-ignored, over `CODEBASE_MAX_FILE_BYTES`, or a wrong path |
 | "ambiguous" | Pass a longer path from the listed candidates |
 | Recent edit not visible | The file is unsaved, or the watcher is off (`CODEBASE_WATCH_INTERVAL=0`). Save, or call `reindex` |
-| A symbol or call is missing | The language construct is not extracted ([how-it-works](how-it-works.md#what-the-parser-extracts)). Open an issue with a minimal snippet |
+| A symbol or call is missing | The language construct is not extracted ([how-it-works](../concepts/how-it-works.md#what-the-parser-extracts)). Open an issue with a minimal snippet |
 | `find_callers` shows unrelated callers | Name-based matching. Use `receiver=` to filter, or check the files listed |
 | Want a clean rebuild | `codebase-index index --full`, or delete `.codebase-index/` |
 
@@ -43,7 +53,7 @@ repo root, the index, and whether each client's config points at a Python that e
 - **Route prefixes** from `include_router(..., prefix=)` / `app.use("/api", router)` are not added; the router's own `APIRouter(prefix=...)` is.
 - **No types or semantics.** That is what `summarize_file` and the subagents are for.
 - **Unsaved editor buffers** are invisible.
-- **Three languages today:** Python, JavaScript/JSX, TypeScript/TSX ([add one](extending.md)).
+- **Three languages today:** Python, JavaScript/JSX, TypeScript/TSX ([add one](../developers/extending.md)).
 
 Still stuck? [Open an issue](https://github.com/sumits-ampcuscyber/codebase-index-mcp/issues) and paste the output
 of `codebase-index doctor` (it contains paths, so redact if needed).

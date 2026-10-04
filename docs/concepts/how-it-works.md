@@ -160,7 +160,7 @@ the tool descriptions, and the rule/instruction file that `codebase-index setup`
 
 ## Freshness
 
-See [configuration → freshness](configuration.md#freshness). A sync with no changes costs one `git ls-files`
+See [configuration → freshness](../user-guide/configuration.md#freshness). A sync with no changes costs one `git ls-files`
 plus a `stat` per source file. The index records the current git ref and commit (`index_stats`), including
 for worktrees and packed refs. Blind spot: **unsaved editor buffers**.
 

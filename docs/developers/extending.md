@@ -9,7 +9,7 @@
    entering a class/function so nested items get the right parent.
 5. `indexer._Resolver`: optionally teach it the language's import paths so `who_imports` resolves them.
 6. Add a fixture file and assertions to `tests/test_index.py`.
-7. Add the language to the tables in `docs/how-it-works.md` and the README.
+7. Add the language to the tables in `docs/concepts/how-it-works.md` and the README.
 
 Use the [tree-sitter playground](https://tree-sitter.github.io/tree-sitter/7-playground.html) or
 `print(tree.root_node)` to see node and field names.

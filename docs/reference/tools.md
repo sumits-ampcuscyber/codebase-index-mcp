@@ -86,4 +86,4 @@ ranges with `line_start` / `line_end`.
 
 Results are exact for **what is defined where**, and name-based for **who calls whom**. `find_callers`
 matches by function name, shows the receiver, and warns when several definitions share a name: check the
-receiver and file before a large refactor. See [known limits](../README.md#known-limits).
+receiver and file before a large refactor. See [known limits](../user-guide/troubleshooting.md#known-limits).
