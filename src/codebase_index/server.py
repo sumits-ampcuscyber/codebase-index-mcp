@@ -6,15 +6,9 @@ second JSON copy of every answer.
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from mcp.server.mcpserver import MCPServer
 
-# Allow `python mcp_server.py` without installing the package.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import indexer  # noqa: E402
-import queries  # noqa: E402
-from mcp.server.mcpserver import MCPServer  # noqa: E402
+from . import indexer, queries
 
 INSTRUCTIONS = """\
 Local structural index of this repository (tree-sitter + SQLite). Answers cost a few hundred tokens
@@ -112,7 +106,7 @@ def find_route(query: str = "", method: str = "", limit: int = 50) -> str:
       "Needs GEMINI_API_KEY/GOOGLE_API_KEY or ANTHROPIC_API_KEY; after a no-key error do not retry.")
 def summarize_file(file: str, question: str, line_start: int = 0, line_end: int = 0) -> str:
     _fresh()
-    import cheap_delegate
+    from . import cheap_delegate
     return cheap_delegate.summarize_file(file, question, line_start=line_start, line_end=line_end)
 
 

@@ -12,15 +12,13 @@ import textwrap
 import unittest
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(HERE))
 os.environ.pop("GEMINI_API_KEY", None)
 os.environ.pop("GOOGLE_API_KEY", None)
 os.environ.pop("ANTHROPIC_API_KEY", None)
 
-import config  # noqa: E402
-import indexer  # noqa: E402
-import queries  # noqa: E402
+from codebase_index import config  # noqa: E402
+from codebase_index import indexer  # noqa: E402
+from codebase_index import queries  # noqa: E402
 
 FILES = {
     "pkg/__init__.py": "",
@@ -225,11 +223,11 @@ class IndexTest(unittest.TestCase):
         self.assertIn("/health", queries.find_route("health"))
 
     def test_summarize_without_key(self):
-        import cheap_delegate
+        from codebase_index import cheap_delegate
         self.assertIn("needs GEMINI_API_KEY", cheap_delegate.summarize_file("pkg/util.py", "what?"))
 
     def test_mcp_tools_return_plain_text(self):
-        import mcp_server
+        from codebase_index import server as mcp_server
         res = asyncio.run(mcp_server.mcp.call_tool("search_symbol", {"query": "UserService"}))
         self.assertIsNone(getattr(res, "structured_content", None))
         self.assertIn("class UserService", res.content[0].text)

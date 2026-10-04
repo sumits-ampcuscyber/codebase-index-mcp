@@ -37,5 +37,5 @@ hundred tokens; opening a large file costs thousands and stays in context for th
 
 For "how does X work end to end", "trace this flow", or any question that needs more than two or three
 files, hand it to the `codebase-explorer` subagent (`.cursor/agents/codebase-explorer.md`). It runs on a
-fast, cheap model (Grok 4.7 by default; change it with `python setup_cursor.py --model <id>`), uses the
+fast, cheap model (Grok 4.7 by default; change it with `codebase-index setup cursor --model <id>`), uses the
 same index tools, and returns a short written answer, so the raw source never enters this chat.

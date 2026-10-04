@@ -12,8 +12,8 @@ import time
 import urllib.error
 import urllib.request
 
-import indexer
-import queries
+from . import indexer
+from . import queries
 
 DEFAULT_MODELS = {"gemini": "gemini-2.5-flash", "anthropic": "claude-haiku-4-5"}
 MAX_INPUT_CHARS = 400_000  # ~100k tokens; larger inputs must pass a line range

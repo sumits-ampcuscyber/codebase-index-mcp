@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codebase-index-mcp"
+dynamic = ["version"]
+description = "Local MCP server that gives coding agents (Cursor, Claude Code, Codex, VS Code Copilot) a structural index of your repo, so they read facts instead of whole files."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = ["mcp", "model-context-protocol", "tree-sitter", "code-search", "cursor", "claude-code", "codex", "copilot", "token-saving"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development",
+]
+dependencies = [
+    # MCP SDK 2.x: the server uses mcp.server.mcpserver.MCPServer, which does not exist in 1.x
+    "mcp>=2.2,<3",
+    "tree-sitter>=0.23,<1",
+    "tree-sitter-python>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic"]   # only for summarize_file with ANTHROPIC_API_KEY (Gemini needs nothing extra)
+
+[project.scripts]
+codebase-index = "codebase_index.cli:main"
+codebase-index-mcp = "codebase_index.server:main"
+
+[project.urls]
+Homepage = "https://github.com/sumits-ampcuscyber/codebase-index-mcp"
+Issues = "https://github.com/sumits-ampcuscyber/codebase-index-mcp/issues"
+
+[tool.hatch.version]
+path = "src/codebase_index/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codebase_index"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "docs", "README.md", "LICENSE", "CHANGELOG.md"]

@@ -9,8 +9,8 @@ import re
 from collections import defaultdict
 from pathlib import PurePosixPath
 
-import config
-import indexer
+from . import config
+from . import indexer
 
 MAX_SOURCE_LINES = 300  # per read_symbol_source call
 FOLD_MIN = 6            # skeleton view: statements longer than this are folded

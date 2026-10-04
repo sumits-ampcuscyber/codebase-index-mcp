@@ -18,7 +18,7 @@ import time
 from collections import namedtuple
 from pathlib import Path, PurePosixPath
 
-import config
+from . import config
 
 SCHEMA_VERSION = "2"
 

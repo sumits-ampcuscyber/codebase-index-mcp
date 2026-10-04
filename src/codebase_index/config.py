@@ -1,26 +1,40 @@
-"""Central configuration. Everything can be overridden with environment variables
-or with a ".env" file placed next to this file."""
+"""Central configuration. Everything is overridden with environment variables.
+
+Environment variables can also come from a ".env" file. Searched in this order (the real environment
+always wins, and the first file that sets a variable wins):
+  1. the file named by CODEBASE_INDEX_ENV
+  2. ".env" in the source checkout (only when running from a git clone / editable install)
+  3. "~/.codebase-index.env" (a good place for API keys when installed with pipx / pip)
+"""
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-TOOL_DIR = Path(__file__).resolve().parent
+PACKAGE_DIR = Path(__file__).resolve().parent
+# The project folder when running from a clone (src/codebase_index -> project); None when pip-installed.
+SOURCE_DIR = PACKAGE_DIR.parents[1] if (PACKAGE_DIR.parents[1] / "pyproject.toml").is_file() else None
 
 
 def _load_dotenv() -> None:
-    env_file = TOOL_DIR / ".env"
-    if not env_file.is_file():
-        return
-    for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    candidates = []
+    if os.environ.get("CODEBASE_INDEX_ENV"):
+        candidates.append(Path(os.environ["CODEBASE_INDEX_ENV"]).expanduser())
+    if SOURCE_DIR:
+        candidates.append(SOURCE_DIR / ".env")
+    candidates.append(Path.home() / ".codebase-index.env")
+    for env_file in candidates:
+        if not env_file.is_file():
             continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.split(" #", 1)[0].strip().strip('"').strip("'")
-        if key and value and key not in os.environ:  # empty values are ignored
-            os.environ[key] = value
+        for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.split(" #", 1)[0].strip().strip('"').strip("'")
+            if key and value and key not in os.environ:  # empty values are ignored
+                os.environ[key] = value
 
 
 _load_dotenv()
@@ -37,13 +51,14 @@ def _find_root() -> Path:
     env = os.environ.get("CODEBASE_ROOT")
     if env:
         return Path(env).expanduser().resolve()
-    # 1) the repo this tool folder is vendored into, 2) the repo of the current dir, 3) parent of
-    # the tool dir. A git root equal to TOOL_DIR is this tool's own clone, never the target repo.
-    for start in (TOOL_DIR.parent, Path.cwd().resolve()):
+    # 1) the repo this tool is vendored into (running from a clone inside it), 2) the repo of the
+    # current directory. A git root equal to SOURCE_DIR is this tool's own clone, never the target.
+    starts = ([SOURCE_DIR.parent] if SOURCE_DIR else []) + [Path.cwd().resolve()]
+    for start in starts:
         root = _git_root(start)
-        if root is not None and root != TOOL_DIR:
+        if root is not None and root != SOURCE_DIR:
             return root
-    return TOOL_DIR.parent
+    return Path.cwd().resolve()
 
 
 REPO_ROOT: Path = _find_root()
@@ -51,7 +66,7 @@ DB_DIR: Path = REPO_ROOT / ".codebase-index"
 DB_PATH: Path = DB_DIR / "index.db"
 
 try:
-    TOOL_REL = TOOL_DIR.relative_to(REPO_ROOT).as_posix()  # e.g. "codebase-index-mcp"
+    TOOL_REL = SOURCE_DIR.relative_to(REPO_ROOT).as_posix() if SOURCE_DIR else None  # e.g. "codebase-index-mcp"
 except ValueError:
     TOOL_REL = None  # tool folder is outside the repo
 if TOOL_REL == ".":
@@ -79,5 +94,5 @@ WATCH_INTERVAL = float(os.environ.get("CODEBASE_WATCH_INTERVAL", "2"))
 # Parser processes for big (re)index runs. 0 or 1 = parse in-process.
 WORKERS = int(os.environ.get("CODEBASE_INDEX_WORKERS", str(max(1, min(8, (os.cpu_count() or 2) - 1)))))
 
-# Model that the Cursor "codebase-explorer" subagent runs on (written by setup_cursor.py).
+# Model that the Cursor "codebase-explorer" subagent runs on (written by `codebase-index setup cursor`).
 CURSOR_SUBAGENT_MODEL = os.environ.get("CURSOR_SUBAGENT_MODEL", "grok-4.7")

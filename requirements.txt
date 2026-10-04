@@ -1,9 +1,0 @@
-# MCP SDK 2.x (the server uses mcp.server.mcpserver.MCPServer, which does not exist in 1.x)
-mcp>=2.2,<3
-tree-sitter>=0.23,<1
-tree-sitter-python>=0.23
-tree-sitter-javascript>=0.23
-tree-sitter-typescript>=0.23
-
-# Optional: only if you use summarize_file with ANTHROPIC_API_KEY (Gemini needs nothing extra)
-# anthropic
