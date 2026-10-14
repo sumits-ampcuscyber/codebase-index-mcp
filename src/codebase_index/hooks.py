@@ -12,6 +12,7 @@ import shlex
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from . import config
@@ -19,10 +20,15 @@ from . import config
 HOOKS = ("post-commit", "post-checkout", "post-merge", "post-rewrite")
 START = "# >>> codebase-index-mcp >>>"
 END = "# <<< codebase-index-mcp <<<"
+LOCK = "hook-refresh.lock"
+LOCK_STALE = 600  # seconds; an older lock is left over from a crashed run
 
 
 def hooks_dir() -> Path:
-    out = subprocess.run(["git", *config.GIT_SAFE_ARGS, "-C", str(config.REPO_ROOT),
+    git = config.git_exe()
+    if git is None:
+        sys.exit("git not found on PATH")
+    out = subprocess.run([git, *config.GIT_SAFE_ARGS, "-C", str(config.REPO_ROOT),
                           "rev-parse", "--git-path", "hooks"],
                          capture_output=True, text=True)
     if out.returncode != 0:
@@ -67,7 +73,30 @@ def install(uninstall: bool = False) -> None:
 
 
 def refresh_detached() -> None:
-    """Start `codebase-index index --quiet` and return immediately (called by the hooks)."""
+    """Called by the hooks: make sure one background refresh runs, and return at once.
+
+    A rebase or a scripted series of commits fires a hook per commit. While a refresh is pending or
+    running this only bumps the lock's mtime and the running worker goes round once more, so N commits
+    cost one or two index runs instead of N parallel processes fighting over the database."""
+    from . import indexer
+    try:
+        indexer.ensure_db_dir()
+    except (OSError, RuntimeError):
+        return
+    lock = config.DB_DIR / LOCK
+    try:
+        os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+    except FileExistsError:
+        try:
+            m = lock.stat().st_mtime
+            now = time.time()
+            os.utime(lock, (now, max(now, m + 1)))  # always a visible change, even on 1 s mtime filesystems
+        except OSError:
+            return
+        if now - m < LOCK_STALE:
+            return  # the running worker sees the newer mtime and refreshes again
+    except OSError:
+        return
     env = os.environ.copy()
     env["CODEBASE_ROOT"] = str(config.REPO_ROOT)
     kwargs: dict = {"cwd": str(config.REPO_ROOT), "env": env, "stdin": subprocess.DEVNULL,
@@ -77,4 +106,27 @@ def refresh_detached() -> None:
         kwargs["close_fds"] = True
     else:
         kwargs["start_new_session"] = True
-    subprocess.Popen([sys.executable, "-m", "codebase_index", "index", "--quiet"], **kwargs)
+    subprocess.Popen([sys.executable, "-m", "codebase_index", "refresh-detached", "--worker"], **kwargs)
+
+
+def refresh_worker() -> None:
+    """Refresh until no hook asked for another run meanwhile, then release the lock."""
+    from . import indexer
+    lock = config.DB_DIR / LOCK
+    try:
+        while True:
+            try:
+                seen = lock.stat().st_mtime
+            except OSError:
+                seen = None
+            indexer.refresh()
+            try:
+                if lock.stat().st_mtime == seen:
+                    break
+            except OSError:
+                break
+    finally:
+        try:
+            lock.unlink()
+        except OSError:
+            pass

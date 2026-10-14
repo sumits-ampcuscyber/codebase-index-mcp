@@ -180,6 +180,8 @@ def run_setup(args) -> None:
         print()
     print(f"Repo indexed: {root}\nBuild the index now (optional, the server also does it): "
           f"codebase-index index")
+    print("Note: the MCP config files contain absolute paths of this machine (Python and the repo, which "
+          "include your user name). Review them before committing to a shared repository.")
 
 
 def print_config(args) -> None:

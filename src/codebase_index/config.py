@@ -8,7 +8,9 @@ always wins, and the first file that sets a variable wins):
 """
 from __future__ import annotations
 
+import functools
 import os
+import sys
 from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -89,6 +91,32 @@ EXCLUDE_DIRS = {
 # Prepended to every git call: stops a repo's own .git/config from running commands (core.fsmonitor)
 # and blocks embedded bare repos.
 GIT_SAFE_ARGS = ("-c", "core.fsmonitor=false", "-c", "safe.bareRepository=explicit")
+
+
+@functools.lru_cache(maxsize=8)
+def _find_git(path_env: str, root: str) -> str | None:
+    names = ("git.exe",) if sys.platform == "win32" else ("git",)
+    for d in path_env.split(os.pathsep):
+        d = d.strip().strip('"')
+        if not d or not os.path.isabs(d):
+            continue  # "" and "." mean the current directory
+        try:
+            if Path(d).resolve().is_relative_to(root):
+                continue  # never a git shipped inside the repo being indexed
+        except (OSError, ValueError):
+            continue
+        for name in names:
+            p = os.path.join(d, name)
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                return p
+    return None
+
+
+def git_exe() -> str | None:
+    """Absolute path of git, or None. A bare "git" is unsafe on Windows: CreateProcess also searches the
+    current folder (MCP clients start the server inside the repo), so a repo could ship its own git.exe,
+    and shutil.which does the same. Only absolute PATH entries outside the repo are searched."""
+    return _find_git(os.environ.get("PATH", ""), str(REPO_ROOT))
 
 MAX_FILE_BYTES = int(os.environ.get("CODEBASE_MAX_FILE_BYTES", "1000000"))
 

@@ -40,8 +40,9 @@ def run() -> int:
             importlib.import_module(mod)
         except Exception as e:  # noqa: BLE001 - report any import problem
             say(FAIL, f"cannot import {mod} ({e.__class__.__name__}); pip install '{pip}' in {sys.executable}")
-    if shutil.which("git"):
-        say(OK, "git found")
+    git = config.git_exe()
+    if git:
+        say(OK, f"git found ({git})")
     else:
         say(WARN, "git not on PATH: falls back to a directory walk, .gitignore is not applied")
 

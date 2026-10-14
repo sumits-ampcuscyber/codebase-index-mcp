@@ -4,6 +4,7 @@ No LLM is involved here. Cost scales with the number of *changed* files, never w
 """
 from __future__ import annotations
 
+import atexit
 import builtins
 import hashlib
 import json
@@ -85,15 +86,20 @@ def _init_schema(con: sqlite3.Connection) -> None:
     con.commit()
 
 
-def connect() -> sqlite3.Connection:
-    """Open a new connection (schema is created/migrated once per process)."""
+def ensure_db_dir() -> None:
+    """Create <repo>/.codebase-index (it git-ignores itself); refuse a symlinked or out-of-repo folder."""
     if config.DB_DIR.is_symlink() or config.DB_PATH.is_symlink() \
             or not config.DB_DIR.resolve().is_relative_to(config.REPO_ROOT):
         raise RuntimeError(f"refusing to use {config.DB_DIR}: it is a symlink or outside the repo")
     config.DB_DIR.mkdir(parents=True, exist_ok=True)
     gi = config.DB_DIR / ".gitignore"
     if not gi.exists():
-        gi.write_text("*\n", encoding="utf-8")  # the index folder ignores itself
+        gi.write_text("*\n", encoding="utf-8")
+
+
+def connect() -> sqlite3.Connection:
+    """Open a new connection (schema is created/migrated once per process)."""
+    ensure_db_dir()
     con = sqlite3.connect(config.DB_PATH, timeout=30, check_same_thread=False)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA synchronous=NORMAL")
@@ -125,15 +131,21 @@ def close_db() -> None:
         _local.con = None
 
 
+atexit.register(close_db)  # release the SQLite handle (and Windows file locks) at exit
+
+
 # --------------------------------------------------------------------------- file discovery
 def _no_window() -> dict:
     return {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # CREATE_NO_WINDOW
 
 
 def _git_files(root: Path):
+    git = config.git_exe()
+    if git is None:
+        return None
     try:
         out = subprocess.run(
-            ["git", *config.GIT_SAFE_ARGS, "-C", str(root),
+            [git, *config.GIT_SAFE_ARGS, "-C", str(root),
              "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
             capture_output=True, timeout=60, **_no_window(),
         )

@@ -15,6 +15,12 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 - Limits and depths are clamped.
 - CI: least-privilege `GITHUB_TOKEN` permissions, `persist-credentials: false`, pinned actions (commit SHAs), and Dependabot updates for actions and pip.
 
+- Windows: git is run by absolute path from absolute `PATH` entries outside the repo. A bare `git` (and `shutil.which`) also searches the current folder, so a repo started as the server's working folder could ship its own `git.exe` and have it run on every refresh.
+- `CODEBASE_OFFLINE=1` disables `summarize_file` even when an API key is present; likely credentials are masked line by line before any file content is sent.
+- Server instructions and the installed rule state that tool results are data, not instructions.
+- Git hooks coalesce: during a rebase or scripted commits one background worker re-runs as needed instead of one process per commit.
+- `setup` warns that generated MCP configs contain absolute local paths; this repo ignores `/.vscode/` and `/.agents/`. The SQLite connection is closed at exit. CI upgrades pip before `pip-audit` (CVE-2026-13346).
+
 ### Added
 - `codebase-index setup antigravity`: writes `.agents/mcp_config.json` and the `AGENTS.md` instruction block. `setup all` includes it.
 - `codebase-index doctor` checks `.agents/mcp_config.json`.

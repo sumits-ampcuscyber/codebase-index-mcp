@@ -11,3 +11,5 @@ build/
 /.cursor/
 /.mcp.json
 /.claude/
+/.vscode/
+/.agents/

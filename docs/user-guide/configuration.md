@@ -28,9 +28,13 @@ empty values are ignored.
 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | none | Enables `summarize_file` with Gemini (default `gemini-2.5-flash`) |
 | `ANTHROPIC_API_KEY` | none | Enables `summarize_file` with Claude (default `claude-haiku-4-5`; needs `pip install anthropic`) |
 | `CHEAP_MODEL_PROVIDER`, `CHEAP_MODEL` | auto | Choose provider (`gemini`/`anthropic`) and model for `summarize_file` |
+| `CODEBASE_OFFLINE` | off | `1` disables `summarize_file` even when a key is set: no code leaves the machine |
 
 `summarize_file` answers are cached by (file content, line range, question, model). Without a key every other
-tool works and `summarize_file` replies with a clear "no key" message.
+tool works and `summarize_file` replies with a clear "no key" message. Before anything is sent, likely
+credentials (cloud and GitHub tokens, `password = "..."`-style assignments, passwords in URLs, private-key
+blocks) are masked line by line, and the answer says how many were masked. Masking is a safety net, not a
+guarantee: set `CODEBASE_OFFLINE=1` for code that must not leave the machine.
 
 ## What is indexed
 

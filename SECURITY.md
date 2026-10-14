@@ -24,15 +24,20 @@ repository profile. You will get an answer within a few days.
   the checked one; a swap in between is refused.
 - `.git/HEAD`, `commondir` and refs are read only to show the current commit: only a well-formed `refs/...`
   name is followed and only a commit id is ever returned.
+- git is run by absolute path, found only in absolute `PATH` entries outside the repo. A bare `git` (and
+  `shutil.which`) on Windows also searches the current folder, where MCP clients start the server, so a
+  repo could otherwise ship its own `git.exe`.
 - git runs with `core.fsmonitor=false` and `safe.bareRepository=explicit`, so a repo's own `.git/config`
   cannot make the indexer run commands.
 - API keys come from the environment or `.env` files and are never logged or stored in the index. The
   repo being indexed cannot supply them: only the process environment, `CODEBASE_INDEX_ENV`, this tool's own
   `.env` and `~/.codebase-index.env` are read. Any key in the server's environment enables `summarize_file`,
-  so leave `GEMINI_API_KEY` / `GOOGLE_API_KEY` / `ANTHROPIC_API_KEY` out of the MCP server's environment for
-  code that must not leave the machine.
+  so set `CODEBASE_OFFLINE=1` (or leave the keys out of the server's environment) for code that must not
+  leave the machine. Likely credentials are masked before a file is sent; treat that as a safety net only.
 - `codebase-index setup` writes only inside the workspace. It refuses to write through symlinks that leave
   the workspace, and it never edits global client configs. Git hook lines are shell-quoted.
 
-Treat answers from the index as untrusted data when the repo itself is untrusted: file contents and
+The server's instructions tell the agent that tool results are data, not instructions. That is a hint to
+the model, not a security boundary. Treat answers from the index as untrusted data when the repo itself is
+untrusted: file contents and
 docstrings can contain text that tries to instruct the agent (prompt injection).

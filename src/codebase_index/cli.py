@@ -83,7 +83,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--top", type=int, default=8, help="how many of the largest files to compare")
     p = sub.add_parser("hooks", help="install git hooks that refresh the index")
     p.add_argument("--uninstall", action="store_true")
-    sub.add_parser("refresh-detached")  # used by the git hooks
+    p = sub.add_parser("refresh-detached")  # used by the git hooks
+    p.add_argument("--worker", action="store_true")
     return ap
 
 
@@ -107,7 +108,7 @@ def main(argv: list[str] | None = None) -> None:
         return hooks.install(uninstall=a.uninstall)
     if a.cmd == "refresh-detached":
         from . import hooks
-        return hooks.refresh_detached()
+        return hooks.refresh_worker() if a.worker else hooks.refresh_detached()
 
     from . import indexer, queries
     if a.cmd == "index":
