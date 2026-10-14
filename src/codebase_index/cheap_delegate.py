@@ -104,10 +104,10 @@ def summarize_file(file: str, question: str, line_start: int = 0, line_end: int 
     rel, err = queries.resolve_indexed(con, file)  # only indexed files may leave the machine
     if err:
         return err
-    _, path = queries.safe_disk_path(rel)
-    if path is None:
+    data = queries.read_repo_file(rel)
+    if data is None:
         return f"error: cannot read '{file}'"
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    lines = data.decode("utf-8", "replace").splitlines()
     a = max(1, line_start or 1)
     b = min(len(lines), line_end or len(lines))
     numbered = "\n".join(f"{i}: {lines[i - 1]}" for i in range(a, b + 1))

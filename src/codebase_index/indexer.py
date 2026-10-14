@@ -11,7 +11,6 @@ import os
 import posixpath
 import re
 import sqlite3
-import stat as _stat
 import subprocess
 import sys
 import threading
@@ -19,7 +18,7 @@ import time
 from collections import namedtuple
 from pathlib import Path, PurePosixPath
 
-from . import config
+from . import config, safefs
 
 SCHEMA_VERSION = "2"
 
@@ -88,7 +87,8 @@ def _init_schema(con: sqlite3.Connection) -> None:
 
 def connect() -> sqlite3.Connection:
     """Open a new connection (schema is created/migrated once per process)."""
-    if config.DB_DIR.is_symlink() or config.DB_PATH.is_symlink()             or not config.DB_DIR.resolve().is_relative_to(config.REPO_ROOT):
+    if config.DB_DIR.is_symlink() or config.DB_PATH.is_symlink() \
+            or not config.DB_DIR.resolve().is_relative_to(config.REPO_ROOT):
         raise RuntimeError(f"refusing to use {config.DB_DIR}: it is a symlink or outside the repo")
     config.DB_DIR.mkdir(parents=True, exist_ok=True)
     gi = config.DB_DIR / ".gitignore"
@@ -799,19 +799,6 @@ def _make_pool(n_files: int):
         return None
 
 
-def _safe_stat(abs_path: Path) -> os.stat_result | None:
-    """stat() of an indexable file, or None: missing, a symlink leaving the repo, or not a regular file."""
-    try:
-        st = os.lstat(abs_path)
-        if _stat.S_ISLNK(st.st_mode):  # follow links only when they stay inside the repo
-            if not abs_path.resolve().is_relative_to(config.REPO_ROOT):
-                return None
-            st = abs_path.stat()
-        return st if _stat.S_ISREG(st.st_mode) else None  # a FIFO would block read_bytes forever
-    except (OSError, RuntimeError):
-        return None
-
-
 def sync(full: bool = False) -> dict:
     """Bring the index up to date. Cheap when nothing changed: a stat() per file, and a
     content hash + re-parse only for files whose mtime/size changed."""
@@ -822,9 +809,9 @@ def sync(full: bool = False) -> dict:
         seen: set[str] = set()
         stats = {"scanned": 0, "reindexed": 0, "removed": 0, "skipped_large": 0}
         all_files = repo_files()
-        todo = []
+        todo, dirs = [], {}
         for rel in iter_source_files(all_files):
-            st = _safe_stat(config.REPO_ROOT / rel)
+            st = safefs.lstat_file(rel, dirs)  # None for links (symlink/junction) anywhere in the path
             if st is None:
                 continue
             stats["scanned"] += 1
@@ -841,9 +828,8 @@ def sync(full: bool = False) -> dict:
         for i in range(0, len(todo), _BATCH):
             jobs, meta = [], {}
             for rel, st, row in todo[i:i + _BATCH]:
-                try:
-                    data = (config.REPO_ROOT / rel).read_bytes()
-                except OSError:
+                data = safefs.read_bytes(rel, config.MAX_FILE_BYTES)  # re-checked on the descriptor it reads
+                if data is None:
                     seen.discard(rel)
                     continue
                 digest = hashlib.sha1(data, usedforsecurity=False).hexdigest()  # change detection only
@@ -872,9 +858,8 @@ def sync(full: bool = False) -> dict:
             resolve_deps(con, all_files)
             con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('deps_built', '1')")
         con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('last_sync_at', ?)", (str(time.time()),))
-        head = _git_head()
-        if head:
-            con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('git_head', ?)", (head,))
+        # Always overwrite, even with "": an index built by an older version may hold a stale value.
+        con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('git_head', ?)", (_git_head(),))
         con.commit()
         return stats
     finally:
@@ -929,10 +914,11 @@ def _ts_alias_rules(all_files: list[str]) -> list[tuple]:
         base = posixpath.basename(rel)
         if not ((base.startswith("tsconfig") and base.endswith(".json")) or base == "jsconfig.json"):
             continue
-        if _safe_stat(config.REPO_ROOT / rel) is None:  # no symlinks out of the repo, no FIFOs
+        raw = safefs.read_bytes(rel, config.MAX_FILE_BYTES)
+        if raw is None:
             continue
         try:
-            cfg = _load_jsonc((config.REPO_ROOT / rel).read_text(encoding="utf-8", errors="replace"))
+            cfg = _load_jsonc(raw.decode("utf-8", "replace"))
         except Exception:
             continue
         opts = (cfg or {}).get("compilerOptions") or {}
@@ -1075,7 +1061,7 @@ def _git_dir(root: Path):
         return g
     if g.is_file():  # worktree / submodule: "gitdir: <path>"
         try:
-            text = g.read_text(encoding="utf-8", errors="replace").strip()
+            text = safefs.read_small(g).strip()
         except OSError:
             return None
         if text.startswith("gitdir:"):
@@ -1084,34 +1070,43 @@ def _git_dir(root: Path):
     return None
 
 
+# HEAD, commondir and .git files are repo-controlled in a copied (not cloned) repo: only a well-formed
+# "refs/..." name is followed and only a commit id is returned, so they cannot be used to read files.
+_REF_RE = re.compile(r"refs/[^\x00-\x20\x7f~^:?*\[\\]+")
+_SHA_RE = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?")
+
+
 def _git_head() -> str:
     """Current branch ref + commit, so a checkout/pull is visible in the stored index."""
     gd = _git_dir(config.REPO_ROOT)
     if gd is None:
         return ""
     try:
-        text = (gd / "HEAD").read_text(encoding="utf-8", errors="replace").strip()
+        text = safefs.read_small(gd / "HEAD", 256).strip()
     except OSError:
         return ""
     if not text.startswith("ref:"):
-        return text
+        return text if _SHA_RE.fullmatch(text) else ""  # detached HEAD
     ref = text.split(":", 1)[1].strip()
+    if not _REF_RE.fullmatch(ref) or ".." in ref or "//" in ref or ref.endswith(("/", ".lock")):
+        return ""
     common = gd
     try:
-        cd = (gd / "commondir").read_text(encoding="utf-8").strip()
-        common = (gd / cd).resolve()
-    except OSError:
+        common = (gd / safefs.read_small(gd / "commondir", 4096).strip()).resolve()
+    except (OSError, ValueError):
         pass
     for base in (gd, common):
         try:
-            return f"{ref} {(base / ref).read_text(encoding='utf-8', errors='replace').strip()}"
-        except OSError:
-            pass
+            sha = safefs.read_small(base / ref, 256).strip()
+        except (OSError, ValueError):
+            continue
+        return f"{ref} {sha}" if _SHA_RE.fullmatch(sha) else ref
     try:
-        for line in (common / "packed-refs").read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.endswith(" " + ref) and not line.startswith(("#", "^")):
-                return f"{ref} {line.split(' ', 1)[0]}"
-    except OSError:
+        for line in safefs.read_small(common / "packed-refs", 64 << 20).splitlines():
+            sha, _, name = line.partition(" ")
+            if name == ref and _SHA_RE.fullmatch(sha):
+                return f"{ref} {sha}"
+    except (OSError, ValueError):
         pass
     return ref
 

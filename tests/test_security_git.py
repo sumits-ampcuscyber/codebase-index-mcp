@@ -1,4 +1,4 @@
-"""Security regressions: repo-controlled git config, symlink escapes, and shell quoting in hooks.
+"""Security regressions: repo-controlled git config and shell quoting in hooks (links: test_safefs.py).
 
 Run:  python -m unittest discover -s tests -v
 """
@@ -55,32 +55,6 @@ class FsmonitorTest(unittest.TestCase):
             self.assertFalse((root / "pwned.txt").exists())
             self.assertIsNotNone(files)
             self.assertIn("app.py", files)
-
-
-class SymlinkTest(_GlobalsMixin, unittest.TestCase):
-    def test_safe_stat(self):
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as outer, \
-                tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
-            root = Path(d)
-            self._patch_root(root)
-            (root / "normal.py").write_text("x = 1\n", encoding="utf-8")
-            self.assertIsNotNone(indexer._safe_stat(root / "normal.py"))
-            self.assertIsNone(indexer._safe_stat(root / "missing.py"))
-
-            secret = Path(outer) / "credentials"
-            secret.write_text("secret\n", encoding="utf-8")
-            try:
-                (root / "link.py").symlink_to(secret)
-            except (OSError, NotImplementedError):
-                self.skipTest("symlinks are not permitted here")
-            self.assertIsNone(indexer._safe_stat(root / "link.py"))
-
-            # A symlink that stays inside the repo is followed.
-            try:
-                (root / "inner.py").symlink_to(root / "normal.py")
-            except (OSError, NotImplementedError):
-                return
-            self.assertIsNotNone(indexer._safe_stat(root / "inner.py"))
 
 
 class HooksQuotingTest(_GlobalsMixin, unittest.TestCase):

@@ -56,6 +56,7 @@ flowchart LR
 | `clients.py` | Per-client setup: merges MCP config JSON, edits instruction files between markers, installs subagents |
 | `cheap_delegate.py` | Optional `summarize_file` with a content-keyed cache |
 | `config.py` | Environment variables, `.env` search, repo-root detection |
+| `safefs.py` | The only way repo files are read: refuses symlinks/junctions in any path component and non-regular files; race-free `openat` reads on Linux/macOS |
 | `templates/` | The instruction/rule/subagent files that `setup` installs |
 
 ## The indexing pipeline

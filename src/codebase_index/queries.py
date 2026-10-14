@@ -11,6 +11,7 @@ from pathlib import PurePosixPath
 
 from . import config
 from . import indexer
+from . import safefs
 
 MAX_SOURCE_LINES = 300  # per read_symbol_source call
 FOLD_MIN = 6            # skeleton view: statements longer than this are folded
@@ -50,15 +51,9 @@ def resolve_indexed(con, file: str):
                   f"too large, or does not exist). Read it directly instead.")
 
 
-def safe_disk_path(file: str):
-    """Resolve a repo-relative path to a file on disk, refusing anything outside the repo."""
-    rel = normalize_path(file)
-    p = (config.REPO_ROOT / rel).resolve()
-    try:
-        p.relative_to(config.REPO_ROOT)
-    except ValueError:
-        return None, None
-    return (rel, p) if p.is_file() else (None, None)
+def read_repo_file(rel: str) -> bytes | None:
+    """Bytes of an indexed file, or None. Never follows a symlink/junction or leaves the repo (see safefs)."""
+    return safefs.read_bytes(rel, config.MAX_FILE_BYTES)
 
 
 def _qual(parent, name) -> str:
@@ -559,26 +554,25 @@ def read_symbol_source(file: str = "", symbol: str = "", line_start: int = 0, li
             continue
         targets += [(r["file"], r["line_start"], r["line_end"], _qual(r["parent"], r["name"])) for r in rows[:3]]
 
+    out, budget, cache = [], MAX_SOURCE_LINES, {}
     if not syms:
-        rel, path = safe_disk_path(rel_idx)
-        if path is None:
-            return f"error: cannot read '{file}' (missing or outside the repository)"
+        data = read_repo_file(rel_idx)
+        if data is None:
+            return f"error: cannot read '{file}' (missing, a link, or outside the repository)"
         if not line_start:
             return "error: give symbol=... or line_start/line_end"
+        cache[rel_idx] = (data, data.decode("utf-8", "replace").splitlines())
         end = line_end or line_start + 80
-        targets.append((rel, line_start, end, f"lines {line_start}-{end}"))
-
-    out, budget, cache = [], MAX_SOURCE_LINES, {}
+        targets.append((rel_idx, line_start, end, f"lines {line_start}-{end}"))
     for rel, a, b, label in targets:
         if budget <= 0:
             out.append(f"(line budget used up; read '{label}' in a separate call)")
             continue
         if rel not in cache:
-            _, path = safe_disk_path(rel)
-            if path is None:
+            data = read_repo_file(rel)
+            if data is None:
                 out.append(f"error: cannot read '{rel}'")
                 continue
-            data = path.read_bytes()
             cache[rel] = (data, data.decode("utf-8", "replace").splitlines())
         data, lines = cache[rel]
         a, b = max(1, a), min(len(lines), b)

@@ -7,7 +7,9 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 ### Security
 - git fsmonitor command execution blocked (`core.fsmonitor=false`, `safe.bareRepository=explicit`), so a repo's own `.git/config` cannot run commands.
 - File reads restricted to indexed files: `read_symbol_source` line ranges and `summarize_file` no longer reach untracked or ignored files such as `.env`.
-- Symlinks that resolve outside the repo and non-regular files are skipped when indexing; a symlinked index folder is refused.
+- Symlinks and Windows junctions are refused in every path component, including links that stay inside the repo (an in-repo `visible.py -> .env` link could expose an ignored secret, and git on Windows lists files inside a junction to another folder). Only regular files are read; a symlinked index folder or database is refused.
+- All repo-file reads go through `safefs`: on Linux/macOS a race-free `openat`/`O_NOFOLLOW` walk with checks on the descriptor that is read; on Windows a check/open/compare-file-id sequence.
+- `.git/HEAD` handling no longer follows arbitrary `ref:` paths (a crafted HEAD in a copied repo made `index_stats` print any file); only `refs/...` names are followed and only commit ids are shown. A stale value in an existing index is overwritten.
 - Git hook script lines are shell-quoted.
 - `codebase-index setup` refuses to write through symlinked targets that resolve outside the workspace.
 - Limits and depths are clamped.
