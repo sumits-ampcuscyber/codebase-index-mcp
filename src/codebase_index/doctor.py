@@ -17,7 +17,8 @@ def _client_files() -> list[tuple[str, Path, str]]:
     r = config.REPO_ROOT
     return [("Cursor", r / ".cursor" / "mcp.json", "mcpServers"),
             ("Claude Code", r / ".mcp.json", "mcpServers"),
-            ("VS Code", r / ".vscode" / "mcp.json", "servers")]
+            ("VS Code", r / ".vscode" / "mcp.json", "servers"),
+            ("Antigravity", r / ".agents" / "mcp_config.json", "mcpServers")]
 
 
 def run() -> int:
@@ -78,7 +79,7 @@ def run() -> int:
             ok = Path(cmd).exists() or shutil.which(cmd)
             say(OK if ok else FAIL, f"{label}: server '{name}' -> {cmd}" + ("" if ok else "  (command not found)"))
     if not found:
-        say(WARN, "no client config in this repo: run `codebase-index setup <cursor|claude-code|vscode|codex>`")
+        say(WARN, "no client config in this repo: run `codebase-index setup <cursor|claude-code|vscode|codex|antigravity>`")
 
     keys = [k for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY") if os.environ.get(k)]
     say(OK, f"summarize_file enabled via {keys[0]}" if keys else

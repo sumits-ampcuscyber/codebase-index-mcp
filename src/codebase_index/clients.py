@@ -4,6 +4,7 @@
   codebase-index setup claude-code   .mcp.json, CLAUDE.md block, .claude/agents/codebase-explorer.md
   codebase-index setup vscode        .vscode/mcp.json, .github/copilot-instructions.md block
   codebase-index setup codex         AGENTS.md block; prints the `codex mcp add` command (global config)
+  codebase-index setup antigravity   .agents/mcp_config.json, AGENTS.md block
 
 Config files are merged (other servers are kept) and instruction files are edited between marker lines,
 so every command is safe to re-run. Nothing outside the workspace is touched.
@@ -22,7 +23,7 @@ from . import config
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 MD_START = "<!-- codebase-index:start -->"
 MD_END = "<!-- codebase-index:end -->"
-CLIENTS = ("cursor", "claude-code", "vscode", "codex")
+CLIENTS = ("cursor", "claude-code", "vscode", "codex", "antigravity")
 
 
 def template(name: str) -> str:
@@ -45,10 +46,14 @@ def server_entry(root: Path, *, typed: bool = False) -> dict:
 
 
 class Writer:
-    def __init__(self, dry: bool):
+    def __init__(self, dry: bool, ws: Path):
         self.dry = dry
+        self.ws = ws.resolve()
 
     def write(self, path: Path, text: str) -> None:
+        # A cloned repo may ship .claude/.cursor/... or .mcp.json as symlinks; never follow them out.
+        if not path.resolve().is_relative_to(self.ws):
+            sys.exit(f"refusing to write {path}: it resolves outside the workspace (symlink?)")
         old = path.read_text(encoding="utf-8") if path.exists() else None
         if old == text:
             print(f"unchanged   {path}")
@@ -93,7 +98,7 @@ def _shell_join(cmd: list[str]) -> str:
 
 def setup_cursor(ws: Path, root: Path, name: str, model: str, subagent: bool, w: Writer) -> list[str]:
     cur = ws / ".cursor"
-    w.merge_json(cur / "mcp.json", "mcpServers", name, server_entry(root))
+    w.merge_json(cur / "mcp.json", "mcpServers", name, server_entry(root, typed=True))
     rule = template("cursor-rule.mdc")
     if subagent:
         rule = rule.replace("Grok 4.7 by default", f"`{model}` in this workspace")
@@ -136,14 +141,26 @@ def setup_codex(ws: Path, root: Path, name: str, model: str, subagent: bool, w: 
     toml = (f'[mcp_servers.{name}]\ncommand = {json.dumps(sys.executable)}\n'
             f'args = ["-m", "codebase_index.server"]\n'
             f'env = {{ CODEBASE_ROOT = {json.dumps(str(root))} }}')
-    return ["Codex keeps MCP servers in your global ~/.codex/config.toml, so this tool does not edit it. "
-            "Run ONE of:",
+    return ["Codex reads MCP servers from the global ~/.codex/config.toml or a trusted project's "
+            ".codex/config.toml; this tool edits neither. Run ONE of:",
             "  " + _shell_join(cmd),
-            "or add to ~/.codex/config.toml:\n" + "\n".join("  " + ln for ln in toml.splitlines())]
+            "or add to ~/.codex/config.toml:\n" + "\n".join("  " + ln for ln in toml.splitlines()),
+            f"or put the same table in {ws / '.codex' / 'config.toml'} (project-scoped, trusted projects only)."]
 
 
-SETUP = {"cursor": setup_cursor, "claude-code": setup_claude_code, "vscode": setup_vscode, "codex": setup_codex}
-DEFAULT_MODEL = {"cursor": None, "claude-code": "haiku", "vscode": "", "codex": ""}
+def setup_antigravity(ws: Path, root: Path, name: str, model: str, subagent: bool, w: Writer) -> list[str]:
+    del model, subagent  # Antigravity has no per-server subagent model
+    w.merge_json(ws / ".agents" / "mcp_config.json", "mcpServers", name, server_entry(root))
+    w.md_block(ws / "AGENTS.md", template("instructions.md"))
+    return ["Antigravity: reload server configurations with `/mcp` in the Antigravity CLI, or press the refresh "
+            "button under Installed MCP Servers in the app.",
+            "To use it in every project instead, merge the same entry into ~/.gemini/config/mcp_config.json "
+            "(run `codebase-index config` to print it)."]
+
+
+SETUP = {"cursor": setup_cursor, "claude-code": setup_claude_code, "vscode": setup_vscode, "codex": setup_codex,
+         "antigravity": setup_antigravity}
+DEFAULT_MODEL = {"cursor": None, "claude-code": "haiku", "vscode": "", "codex": "", "antigravity": ""}
 
 
 def run_setup(args) -> None:
@@ -151,7 +168,7 @@ def run_setup(args) -> None:
     # An explicit --workspace is the repo to index, unless CODEBASE_ROOT already says otherwise.
     root = ws if args.workspace and not os.environ.get("CODEBASE_ROOT") else config.REPO_ROOT
     name = args.name or default_name()
-    w = Writer(args.dry_run)
+    w = Writer(args.dry_run, ws)
     clients = CLIENTS if args.client == "all" else (args.client,)
     for client in clients:
         model = args.model or DEFAULT_MODEL[client] or config.CURSOR_SUBAGENT_MODEL

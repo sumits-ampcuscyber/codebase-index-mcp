@@ -2,6 +2,27 @@
 
 All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Security
+- git fsmonitor command execution blocked (`core.fsmonitor=false`, `safe.bareRepository=explicit`), so a repo's own `.git/config` cannot run commands.
+- File reads restricted to indexed files: `read_symbol_source` line ranges and `summarize_file` no longer reach untracked or ignored files such as `.env`.
+- Symlinks that resolve outside the repo and non-regular files are skipped when indexing; a symlinked index folder is refused.
+- Git hook script lines are shell-quoted.
+- `codebase-index setup` refuses to write through symlinked targets that resolve outside the workspace.
+- Limits and depths are clamped.
+- CI: least-privilege `GITHUB_TOKEN` permissions, `persist-credentials: false`, pinned actions (commit SHAs), and Dependabot updates for actions and pip.
+
+### Added
+- `codebase-index setup antigravity`: writes `.agents/mcp_config.json` and the `AGENTS.md` instruction block. `setup all` includes it.
+- `codebase-index doctor` checks `.agents/mcp_config.json`.
+- Platform guide for Google Antigravity.
+
+### Changed
+- `setup cursor` writes `"type": "stdio"` in its `.cursor/mcp.json` entry.
+- `setup codex` notes the project-scoped option (`.codex/config.toml`, trusted projects only).
+- Platform guides refreshed against current vendor docs: Antigravity's global config path is now `~/.gemini/config/mcp_config.json` (was `~/.gemini/antigravity/`); Claude Code approval and `claude mcp reset-project-choices`; Codex timeouts; Cursor MCP Logs; VS Code Restricted Mode and autostart.
+
 ## [0.2.0] - 2026-10-04
 
 ### Added

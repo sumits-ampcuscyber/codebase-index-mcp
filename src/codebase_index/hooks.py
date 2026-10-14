@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import stat
 import subprocess
 import sys
@@ -21,7 +22,8 @@ END = "# <<< codebase-index-mcp <<<"
 
 
 def hooks_dir() -> Path:
-    out = subprocess.run(["git", "-C", str(config.REPO_ROOT), "rev-parse", "--git-path", "hooks"],
+    out = subprocess.run(["git", *config.GIT_SAFE_ARGS, "-C", str(config.REPO_ROOT),
+                          "rev-parse", "--git-path", "hooks"],
                          capture_output=True, text=True)
     if out.returncode != 0:
         sys.exit(f"Not a git repository: {config.REPO_ROOT}\n{out.stderr.strip()}")
@@ -32,7 +34,8 @@ def hooks_dir() -> Path:
 def block() -> str:
     py = Path(sys.executable).as_posix()
     return (f'{START}\n'
-            f'CODEBASE_ROOT="{config.REPO_ROOT.as_posix()}" "{py}" -m codebase_index refresh-detached\n'
+            f'CODEBASE_ROOT={shlex.quote(config.REPO_ROOT.as_posix())} {shlex.quote(py)} '
+            f'-m codebase_index refresh-detached\n'
             f'{END}\n')
 
 

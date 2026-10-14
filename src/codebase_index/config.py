@@ -86,6 +86,10 @@ EXCLUDE_DIRS = {
     ".mypy_cache", ".pytest_cache", ".ruff_cache", "coverage", ".turbo",
 } | {d.strip() for d in os.environ.get("CODEBASE_EXCLUDE_DIRS", "").split(",") if d.strip()}
 
+# Prepended to every git call: stops a repo's own .git/config from running commands (core.fsmonitor)
+# and blocks embedded bare repos.
+GIT_SAFE_ARGS = ("-c", "core.fsmonitor=false", "-c", "safe.bareRepository=explicit")
+
 MAX_FILE_BYTES = int(os.environ.get("CODEBASE_MAX_FILE_BYTES", "1000000"))
 
 # Seconds between background re-scans while the MCP server runs; 0 turns the watcher off.

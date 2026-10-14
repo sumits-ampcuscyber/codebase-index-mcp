@@ -17,7 +17,7 @@ repo root, the index, and whether each client's config points at a Python that e
 
 | Symptom | Likely cause → fix |
 |---|---|
-| Tools missing in the client | The client was not restarted, or the MCP entry is not loaded. Restart / toggle the server (Cursor: Settings → MCP; Claude Code: `/mcp`; VS Code: MCP: List Servers) |
+| Tools missing in the client | The client was not restarted, or the MCP entry is not loaded. Restart / toggle the server (Cursor: Settings → MCP; Claude Code: `/mcp`; VS Code: MCP: List Servers; Antigravity: `/mcp` or refresh under Installed MCP Servers) |
 | Server shows an error or times out | Run `python -m codebase_index.server` with the same Python the config uses and read the traceback (usually a missing dependency). On a huge repo run `codebase-index index` once first |
 | `command not found` / `No such file` in the client log | The venv or pipx environment was moved or deleted. Re-run `codebase-index setup <client>` from an environment where the package is installed |
 | `No module named codebase_index` | The config's Python does not have the package. Reinstall into that Python, or re-run `setup` with the right one |
@@ -41,6 +41,12 @@ repo root, the index, and whether each client's config points at a Python that e
 | Symptom | Fix |
 |---|---|
 | Cursor: subagent model not found | Use the exact id from Cursor's model picker: `codebase-index setup cursor --model <id>` |
+| Cursor: server red | Output panel → **MCP Logs** shows the error |
+| Codex: project config ignored | `.codex/config.toml` is only loaded for trusted projects; trust the project or use `~/.codex/config.toml` |
+| Codex: first start times out | Raise `startup_timeout_sec` (default 10) for that server in the Codex config |
+| Claude Code: project server never approved | `claude mcp list` shows "Pending approval"; approve it, or run `claude mcp reset-project-choices` |
+| VS Code: no servers at all | The workspace is in Restricted Mode, which blocks workspace MCP config. Trust the folder |
+| Antigravity: server not listed | Check `.agents/mcp_config.json` (or `~/.gemini/config/mcp_config.json` for global); then reload |
 | Windows: paths with spaces | Fine: `setup` writes absolute paths as JSON strings. If you edit by hand, use double backslashes or forward slashes |
 | Windows: hook does nothing | Re-run `codebase-index hooks`; hooks use a detached process because plain `&` jobs die in Git Bash |
 | `summarize_file` says "no API key" | Expected without a key. Set `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` ([configuration](configuration.md)) or use `read_symbol_source` instead |

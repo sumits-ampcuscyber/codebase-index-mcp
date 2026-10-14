@@ -15,7 +15,7 @@ This puts `codebase-index` on your PATH in its own isolated environment. Then, i
 
 ```bash
 cd /path/to/your-repo
-codebase-index setup cursor      # or claude-code | vscode | codex | all
+codebase-index setup cursor      # or claude-code | vscode | codex | antigravity | all
 codebase-index doctor
 ```
 

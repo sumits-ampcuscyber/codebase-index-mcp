@@ -50,6 +50,7 @@ codebase-index setup cursor         # Cursor
 codebase-index setup claude-code    # Claude Code
 codebase-index setup vscode         # VS Code with GitHub Copilot
 codebase-index setup codex          # OpenAI Codex
+codebase-index setup antigravity    # Google Antigravity
 codebase-index setup all            # all of the above
 ```
 
@@ -75,6 +76,7 @@ Restart the editor (or reload the window) so it picks up the new server, then fo
 | Claude Code | Type `/mcp` in a session in your project; approve the server if asked |
 | VS Code | Command Palette → "MCP: List Servers" → start it; use Copilot Chat in **Agent** mode |
 | Codex | Run the `codex mcp add ...` command that `setup codex` printed, then restart Codex |
+| Antigravity | Type `/mcp` in the Antigravity CLI and reload, or click refresh under Installed MCP Servers |
 
 Now ask your assistant:
 
@@ -97,4 +99,5 @@ It shows, for your biggest files, the tokens a full read would cost versus the i
 - Having trouble? [Troubleshooting](troubleshooting.md) and the [FAQ](faq.md).
 - Want to get more out of it? [Using it day to day](using-it.md).
 - Your editor in detail: [Cursor](platforms/cursor.md) · [Claude Code](platforms/claude-code.md) ·
-  [VS Code](platforms/vscode-copilot.md) · [Codex](platforms/codex.md) · [others](platforms/other-clients.md).
+  [VS Code](platforms/vscode-copilot.md) · [Codex](platforms/codex.md) · [Antigravity](platforms/antigravity.md) ·
+  [others](platforms/other-clients.md).

@@ -7,7 +7,7 @@ Run any command with `--help` for its options.
 
 | Command | Purpose |
 |---|---|
-| `setup <client>` | Configure a client for this repo. `client`: `cursor`, `claude-code`, `vscode`, `codex`, `all` |
+| `setup <client>` | Configure a client for this repo. `client`: `cursor`, `claude-code`, `vscode`, `codex`, `antigravity`, `all` |
 | `config` | Print generic `mcpServers` JSON for any other client |
 | `doctor` | Diagnose install, repo, index and client wiring |
 | `bench [--top N]` | Tokens saved vs reading the N largest files (default 8) |

@@ -8,7 +8,7 @@ small local index of your project, so the assistant can ask *"where is `UserServ
 `save`?"* and get a precise answer in a few hundred tokens.
 
 - **Free and private.** It uses a code parser, not an AI model. Nothing leaves your machine.
-- **Works with your editor.** Cursor, Claude Code, VS Code (Copilot), Codex, and any MCP client.
+- **Works with your editor.** Cursor, Claude Code, VS Code (Copilot), Codex, Google Antigravity, and any MCP client.
 - **Set up in one command**, per project. Stays up to date on its own.
 - Supports **Python, JavaScript / JSX, TypeScript / TSX**.
 
@@ -43,7 +43,7 @@ pipx install git+https://github.com/sumits-ampcuscyber/codebase-index-mcp.git
 
 ```bash
 cd path/to/your-project
-codebase-index setup cursor        # or: claude-code | vscode | codex | all
+codebase-index setup cursor        # or: claude-code | vscode | codex | antigravity | all
 ```
 
 **3. Restart your editor and ask:**
@@ -60,7 +60,8 @@ That is the whole thing. Check the wiring any time with `codebase-index doctor`.
 | **Claude Code** | `.mcp.json`, a `CLAUDE.md` block, a Haiku `codebase-explorer` subagent | [Claude Code](docs/user-guide/platforms/claude-code.md) |
 | **VS Code (Copilot)** | `.vscode/mcp.json`, a `copilot-instructions.md` block | [VS Code](docs/user-guide/platforms/vscode-copilot.md) |
 | **Codex** | an `AGENTS.md` block, plus the command to register the server | [Codex](docs/user-guide/platforms/codex.md) |
-| Antigravity, Windsurf, Claude Desktop, Zed, Cline, … | `codebase-index config` prints the JSON to paste | [Other clients](docs/user-guide/platforms/other-clients.md) |
+| **Antigravity** | `.agents/mcp_config.json`, an `AGENTS.md` block | [Antigravity](docs/user-guide/platforms/antigravity.md) |
+| Windsurf, Claude Desktop, Zed, Cline, … | `codebase-index config` prints the JSON to paste | [Other clients](docs/user-guide/platforms/other-clients.md) |
 
 `setup` merges into existing files (your other MCP servers and your own instructions are kept), is safe to
 re-run, and `--dry-run` shows what it would do.

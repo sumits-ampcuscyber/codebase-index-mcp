@@ -69,6 +69,11 @@ def _clip(s: str, n: int) -> str:
     return s if len(s) <= n else s[:n - 3] + "..."
 
 
+def _lim(n: int, hi: int = 500) -> int:
+    """Clamp a caller-supplied limit: SQLite reads LIMIT -1 as unlimited, and negative slices misbehave."""
+    return max(1, min(int(n), hi))
+
+
 def _after_name(sig: str | None, name: str, n: int = 160) -> tuple[str, str]:
     """('async ' or '', signature text after the symbol name): def get(self) -> '(self)'."""
     if not sig:
@@ -104,6 +109,7 @@ def _pagerank(nodes: list[str], edges: list[tuple[str, str]], iters: int = 30, d
 
 
 def repo_map(path: str = "", limit: int = 30) -> str:
+    limit = _lim(limit)
     prefix = normalize_path(path).rstrip("/")
     con = indexer.db()
     if prefix:
@@ -207,6 +213,7 @@ def _search_one(con, query: str, kind: str, limit: int) -> str:
 
 
 def search_symbol(query: str, kind: str = "", limit: int = 20) -> str:
+    limit = _lim(limit)
     queries = [q.strip() for q in query.split(",") if q.strip()]
     if not queries:
         return "error: empty query"
@@ -217,6 +224,7 @@ def search_symbol(query: str, kind: str = "", limit: int = 20) -> str:
 
 # --------------------------------------------------------------------------- file-level
 def get_file_summary(file: str, depth: int = 1) -> str:
+    depth = max(1, min(int(depth), 10))
     con = indexer.db()
     rel, err = resolve_indexed(con, file)
     if err:
@@ -287,6 +295,7 @@ def _caller_rows(con, name: str, receiver: str, limit: int):
 
 
 def find_callers(symbol: str, receiver: str = "", depth: int = 1, limit: int = 30) -> str:
+    limit = _lim(limit)
     name = symbol.strip().rsplit(".", 1)[-1]
     if not name:
         return "error: empty symbol"
@@ -331,6 +340,7 @@ def find_callers(symbol: str, receiver: str = "", depth: int = 1, limit: int = 3
 
 
 def find_callees(symbol: str, file: str = "", limit: int = 40) -> str:
+    limit = _lim(limit)
     sym = symbol.strip()
     if not sym:
         return "error: empty symbol"
@@ -393,6 +403,7 @@ def find_callees(symbol: str, file: str = "", limit: int = 40) -> str:
 
 
 def who_imports(file: str, limit: int = 40) -> str:
+    limit = _lim(limit)
     con = indexer.db()
     rel, err = resolve_indexed(con, file)
     if err:
@@ -412,6 +423,7 @@ def who_imports(file: str, limit: int = 40) -> str:
 
 
 def find_route(query: str = "", method: str = "", limit: int = 50) -> str:
+    limit = _lim(limit)
     con = indexer.db()
     q = "%" + _esc(query.strip()) + "%"
     sql = ("SELECT method, path, handler, file, line FROM routes WHERE (path LIKE ? ESCAPE '\\' "
@@ -518,8 +530,8 @@ def read_symbol_source(file: str = "", symbol: str = "", line_start: int = 0, li
     syms = [s.strip() for s in symbol.split(",") if s.strip()]
     rel_idx = None
     if file:
-        rel_idx, err = resolve_indexed(con, file)
-        if err and syms:
+        rel_idx, err = resolve_indexed(con, file)  # only indexed files are readable
+        if err:
             return err
     elif not syms:
         return "error: give symbol=... (optionally with file=...) or file= with line_start/line_end"
@@ -548,7 +560,7 @@ def read_symbol_source(file: str = "", symbol: str = "", line_start: int = 0, li
         targets += [(r["file"], r["line_start"], r["line_end"], _qual(r["parent"], r["name"])) for r in rows[:3]]
 
     if not syms:
-        rel, path = safe_disk_path(rel_idx or file)
+        rel, path = safe_disk_path(rel_idx)
         if path is None:
             return f"error: cannot read '{file}' (missing or outside the repository)"
         if not line_start:

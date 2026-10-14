@@ -5,7 +5,7 @@ Pick the line that sounds like you.
 | I want to... | Read |
 |---|---|
 | **Just get it working, step by step** (no experience needed) | [Quick start](user-guide/quick-start.md) |
-| Set it up for **my editor** | [Cursor](user-guide/platforms/cursor.md) · [Claude Code](user-guide/platforms/claude-code.md) · [VS Code (Copilot)](user-guide/platforms/vscode-copilot.md) · [Codex](user-guide/platforms/codex.md) · [Other clients](user-guide/platforms/other-clients.md) |
+| Set it up for **my editor** | [Cursor](user-guide/platforms/cursor.md) · [Claude Code](user-guide/platforms/claude-code.md) · [VS Code (Copilot)](user-guide/platforms/vscode-copilot.md) · [Codex](user-guide/platforms/codex.md) · [Antigravity](user-guide/platforms/antigravity.md) · [Other clients](user-guide/platforms/other-clients.md) |
 | See **what to ask** and how to get the most out of it | [Using it day to day](user-guide/using-it.md) |
 | Fix **something that does not work** | [Troubleshooting](user-guide/troubleshooting.md) |
 | Get quick answers | [FAQ](user-guide/faq.md) |

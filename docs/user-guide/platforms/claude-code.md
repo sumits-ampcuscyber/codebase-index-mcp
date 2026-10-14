@@ -12,12 +12,12 @@ It writes (merging with what is there):
 
 | File | Purpose |
 |---|---|
-| `.mcp.json` | Project-scoped MCP server entry (shared with your team if you commit it; contains a machine-specific Python path, so many teams keep it out of git and have each person run `setup`) |
+| `.mcp.json` | Project-scoped MCP server entry (shared with your team if you commit it; contains a machine-specific Python path, so many teams keep it out of git and have each person run `setup`). `${VAR}` and `${VAR:-default}` work in `command`, `args` and `env` |
 | `CLAUDE.md` | A short instruction block between `<!-- codebase-index:start/end -->` markers: use the index before reading files |
 | `.claude/agents/codebase-explorer.md` | Read-only subagent for multi-file questions, **pinned to Haiku** |
 
-Start `claude` in the repo and approve the project server when prompted. Check with `/mcp`: the
-`codebase-index-<repo>` server should be connected with 12 tools.
+Start `claude` in the repo. The first time, Claude Code asks you to approve the project server from `.mcp.json`;
+approve it. Check with `/mcp`: the `codebase-index-<repo>` server should be connected with 12 tools.
 
 Prefer the CLI over a file? `setup` prints the equivalent command:
 
@@ -25,7 +25,8 @@ Prefer the CLI over a file? `setup` prints the equivalent command:
 claude mcp add codebase-index-myrepo --scope project -e CODEBASE_ROOT=/path/to/myrepo -- /path/to/python -m codebase_index.server
 ```
 
-Drop `--scope project` for a personal (local) server that is not shared.
+`claude mcp add` defaults to local scope (personal, not shared). `--scope project` writes `.mcp.json` at the
+project root.
 
 Options: `--model haiku|sonnet|opus|inherit` (subagent model), `--no-subagent`, `--name`, `--workspace`, `--dry-run`.
 
@@ -57,7 +58,8 @@ Ask as usual. Claude Code sees the tools as `mcp__codebase-index-<repo>__search_
 | Symptom | Fix |
 |---|---|
 | `/mcp` shows failed or tools missing | `codebase-index doctor`; make sure the Python path in `.mcp.json` still exists, then re-run `setup claude-code` |
-| Server not prompting for approval | Project servers need one-time approval; run `claude mcp list` and re-approve |
+| Project server never asked for approval, or shows "Pending approval" | Run `claude mcp list`; approve it in an interactive session. To be asked again, run `claude mcp reset-project-choices` |
+| Inspect what Claude Code loaded | `claude mcp get codebase-index-myrepo` |
 | Connection timeout on start | First start builds the index. Run `codebase-index index` once beforehand on very large repos |
 
 More: [troubleshooting](../troubleshooting.md).

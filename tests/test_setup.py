@@ -76,9 +76,30 @@ class SetupTest(unittest.TestCase):
         self.assertTrue((self.ws / "AGENTS.md").exists())
         self.assertFalse((self.ws / ".mcp.json").exists())
 
+    def test_antigravity_writes_workspace_config_and_is_idempotent(self):
+        run_setup(args("antigravity", self.ws))
+        cfg = self.ws / ".agents" / "mcp_config.json"
+        ent = json.loads(cfg.read_text())["mcpServers"]["codebase-index-demo"]
+        self.assertEqual(ent["args"], ["-m", "codebase_index.server"])
+        self.assertIn("CODEBASE_ROOT", ent["env"])
+        self.assertIn(clients.MD_START, (self.ws / "AGENTS.md").read_text())
+        first = (cfg.read_text(), (self.ws / "AGENTS.md").read_text())
+        run_setup(args("antigravity", self.ws))
+        self.assertEqual(first, (cfg.read_text(), (self.ws / "AGENTS.md").read_text()))
+
     def test_dry_run_writes_nothing(self):
         run_setup(args("all", self.ws, dry_run=True))
         self.assertEqual(list(self.ws.iterdir()), [])
+
+    def test_refuses_symlink_leaving_workspace(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as outside:
+            try:
+                (self.ws / ".claude").symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("symlinks need developer mode on Windows")
+            with self.assertRaises(SystemExit):
+                run_setup(args("claude-code", self.ws))
+            self.assertEqual(list(Path(outside).iterdir()), [])
 
 
 class TemplateTest(unittest.TestCase):

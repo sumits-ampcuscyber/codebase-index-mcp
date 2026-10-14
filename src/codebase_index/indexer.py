@@ -11,6 +11,7 @@ import os
 import posixpath
 import re
 import sqlite3
+import stat as _stat
 import subprocess
 import sys
 import threading
@@ -87,6 +88,8 @@ def _init_schema(con: sqlite3.Connection) -> None:
 
 def connect() -> sqlite3.Connection:
     """Open a new connection (schema is created/migrated once per process)."""
+    if config.DB_DIR.is_symlink() or config.DB_PATH.is_symlink()             or not config.DB_DIR.resolve().is_relative_to(config.REPO_ROOT):
+        raise RuntimeError(f"refusing to use {config.DB_DIR}: it is a symlink or outside the repo")
     config.DB_DIR.mkdir(parents=True, exist_ok=True)
     gi = config.DB_DIR / ".gitignore"
     if not gi.exists():
@@ -130,7 +133,8 @@ def _no_window() -> dict:
 def _git_files(root: Path):
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            ["git", *config.GIT_SAFE_ARGS, "-C", str(root),
+             "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
             capture_output=True, timeout=60, **_no_window(),
         )
     except (OSError, subprocess.SubprocessError):
@@ -795,6 +799,19 @@ def _make_pool(n_files: int):
         return None
 
 
+def _safe_stat(abs_path: Path) -> os.stat_result | None:
+    """stat() of an indexable file, or None: missing, a symlink leaving the repo, or not a regular file."""
+    try:
+        st = os.lstat(abs_path)
+        if _stat.S_ISLNK(st.st_mode):  # follow links only when they stay inside the repo
+            if not abs_path.resolve().is_relative_to(config.REPO_ROOT):
+                return None
+            st = abs_path.stat()
+        return st if _stat.S_ISREG(st.st_mode) else None  # a FIFO would block read_bytes forever
+    except (OSError, RuntimeError):
+        return None
+
+
 def sync(full: bool = False) -> dict:
     """Bring the index up to date. Cheap when nothing changed: a stat() per file, and a
     content hash + re-parse only for files whose mtime/size changed."""
@@ -807,10 +824,8 @@ def sync(full: bool = False) -> dict:
         all_files = repo_files()
         todo = []
         for rel in iter_source_files(all_files):
-            abs_path = config.REPO_ROOT / rel
-            try:
-                st = abs_path.stat()
-            except OSError:
+            st = _safe_stat(config.REPO_ROOT / rel)
+            if st is None:
                 continue
             stats["scanned"] += 1
             if st.st_size > config.MAX_FILE_BYTES:
@@ -831,7 +846,7 @@ def sync(full: bool = False) -> dict:
                 except OSError:
                     seen.discard(rel)
                     continue
-                digest = hashlib.sha1(data).hexdigest()
+                digest = hashlib.sha1(data, usedforsecurity=False).hexdigest()  # change detection only
                 if not full and row and row["hash"] == digest:
                     con.execute("UPDATE files SET mtime=?, size=? WHERE path=?", (st.st_mtime_ns, st.st_size, rel))
                     continue
@@ -913,6 +928,8 @@ def _ts_alias_rules(all_files: list[str]) -> list[tuple]:
     for rel in all_files:
         base = posixpath.basename(rel)
         if not ((base.startswith("tsconfig") and base.endswith(".json")) or base == "jsconfig.json"):
+            continue
+        if _safe_stat(config.REPO_ROOT / rel) is None:  # no symlinks out of the repo, no FIFOs
             continue
         try:
             cfg = _load_jsonc((config.REPO_ROOT / rel).read_text(encoding="utf-8", errors="replace"))

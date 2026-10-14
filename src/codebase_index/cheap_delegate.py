@@ -10,6 +10,7 @@ import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from . import indexer
@@ -69,7 +70,8 @@ def _ask_anthropic(key: str, model: str, prompt: str) -> str:
 
 
 def _ask_gemini(key: str, model: str, prompt: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{urllib.parse.quote(model, safe='')}:generateContent")
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -78,7 +80,7 @@ def _ask_gemini(key: str, model: str, prompt: str) -> str:
     req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), method="POST",
                                  headers={"Content-Type": "application/json", "x-goog-api-key": key})
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with urllib.request.urlopen(req, timeout=120) as r:  # nosec B310: fixed https URL
             data = json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "replace")[:300]
@@ -98,15 +100,13 @@ def summarize_file(file: str, question: str, line_start: int = 0, line_end: int 
         return ("error: summarize_file needs GEMINI_API_KEY (or GOOGLE_API_KEY) or ANTHROPIC_API_KEY in "
                 "codebase-index-mcp/.env or the MCP env block. Do not retry in this chat; use "
                 "get_file_summary + read_symbol_source (or a Cursor explore subagent) instead.")
-    rel, path = queries.safe_disk_path(file)
+    con = indexer.db()
+    rel, err = queries.resolve_indexed(con, file)  # only indexed files may leave the machine
+    if err:
+        return err
+    _, path = queries.safe_disk_path(rel)
     if path is None:
-        con = indexer.db()
-        rel_idx, err = queries.resolve_indexed(con, file)
-        if err:
-            return err
-        rel, path = queries.safe_disk_path(rel_idx)
-        if path is None:
-            return f"error: cannot read '{file}'"
+        return f"error: cannot read '{file}'"
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     a = max(1, line_start or 1)
     b = min(len(lines), line_end or len(lines))
@@ -115,9 +115,8 @@ def summarize_file(file: str, question: str, line_start: int = 0, line_end: int 
         return (f"error: {rel} lines {a}-{b} is too large for one cheap-model call "
                 f"(~{len(numbered) // 4:,} tokens). Pass line_start/line_end (see get_file_summary for ranges).")
     question = (question or "What does this file do?").strip()
-    key_hash = hashlib.sha1(f"{provider}|{model}|{rel}|{a}-{b}|{question}|".encode("utf-8")
-                            + hashlib.sha1(numbered.encode("utf-8")).digest()).hexdigest()
-    con = indexer.db()
+    key_hash = hashlib.sha256(f"{provider}|{model}|{rel}|{a}-{b}|{question}|".encode("utf-8")
+                              + hashlib.sha256(numbered.encode("utf-8")).digest()).hexdigest()
     hit = con.execute("SELECT answer FROM summary_cache WHERE key=?", (key_hash,)).fetchone()
     if hit:
         return f"[cached {model}] {hit['answer']}"

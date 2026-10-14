@@ -12,11 +12,12 @@ It writes into `<repo>/.cursor/`, merging with what is already there:
 
 | File | Purpose |
 |---|---|
-| `mcp.json` | The MCP server entry (absolute Python path + `CODEBASE_ROOT`) |
+| `mcp.json` | The MCP server entry (`"type": "stdio"`, absolute Python path + `CODEBASE_ROOT`) |
 | `rules/codebase-index.mdc` | Always-on rule: use the index tools before reading files |
 | `agents/codebase-explorer.md` | Read-only subagent for multi-file questions, **pinned to Grok 4.7** |
 
-Then restart Cursor, or toggle the server under **Settings → MCP**. A green dot and 12 tools means it works.
+Then restart Cursor, or toggle the server under **Customize (MCP)** in Cursor's settings. A green dot and 12 tools
+means it works.
 
 Options: `--model <id>` (subagent model), `--no-subagent`, `--name <server-name>`, `--workspace <folder>`,
 `--dry-run`.
@@ -55,7 +56,7 @@ Use the id exactly as Cursor's model picker shows it. `inherit` (same as the cha
 
 | Symptom | Fix |
 |---|---|
-| Server red / no tools | Run `codebase-index doctor`; the usual cause is a moved or deleted venv: re-run `setup cursor` |
+| Server red / no tools | Open the Output panel and choose **MCP Logs** to read the error. Usually a moved or deleted venv: run `codebase-index doctor`, then re-run `setup cursor` |
 | Subagent model not found | Use the exact id from Cursor's model picker: `setup cursor --model <id>` |
 | Wrong repo in answers | `index_stats` shows the root; fix `CODEBASE_ROOT` in `.cursor/mcp.json` |
 

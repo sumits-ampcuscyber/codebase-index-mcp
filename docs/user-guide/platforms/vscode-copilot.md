@@ -12,12 +12,17 @@ codebase-index setup vscode
 
 | File | Purpose |
 |---|---|
-| `.vscode/mcp.json` | MCP server entry. VS Code's schema uses a top-level `servers` key (not `mcpServers`) |
+| `.vscode/mcp.json` | MCP server entry (`"type": "stdio"`). VS Code's schema uses a top-level `servers` key (not `mcpServers`) |
 | `.github/copilot-instructions.md` | A short instruction block between `<!-- codebase-index:start/end -->` markers |
 
-Then: Command Palette → **MCP: List Servers** → select `codebase-index-<repo>` → **Start Server** (or reload the
-window). Open Copilot Chat, switch to **Agent** mode, and check the tools picker: the 12 codebase-index tools
-should be listed.
+Then open the folder as a **trusted** workspace. In Restricted Mode, VS Code blocks workspace MCP config, so the
+server will not appear until you trust the folder. In a trusted workspace the server can start without a separate
+trust prompt.
+
+Start it: Command Palette → **MCP: List Servers** → select `codebase-index-<repo>` → **Start Server** (or reload the
+window). Servers also start on their own when you send a chat message (`chat.mcp.autostart`, default
+`newAndOutdated`). Open Copilot Chat, switch to **Agent** mode, and check the tools picker: the 12
+codebase-index tools should be listed.
 
 Options: `--name`, `--workspace`, `--dry-run`. (VS Code has no per-server subagent model, so there is no subagent.)
 
@@ -41,7 +46,9 @@ with `#` (for example `#search_symbol`) to nudge the agent.
 | Symptom | Fix |
 |---|---|
 | Server missing in "MCP: List Servers" | The file must be `.vscode/mcp.json` with a `servers` object; run `codebase-index doctor` |
+| Nothing starts, workspace is in Restricted Mode | Trust the folder (Manage Workspace Trust), then reload the window |
 | Server fails to start | Open the server's output (List Servers → Show Output). Usually the Python path is stale: re-run `setup vscode` |
+| Server starts when you send a chat message, not before | That is `chat.mcp.autostart`. Start it manually from List Servers, or change the setting |
 | Tools not offered in chat | Use **Agent** mode, and enable the server's tools in the tools picker |
 
 More: [troubleshooting](../troubleshooting.md).

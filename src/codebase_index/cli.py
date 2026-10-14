@@ -1,6 +1,6 @@
 """codebase-index: build the index, query it from a terminal, and wire it into your agent.
 
-  codebase-index setup cursor|claude-code|vscode|codex|all   configure an agent client for this repo
+  codebase-index setup cursor|claude-code|vscode|codex|antigravity|all   configure an agent client for this repo
   codebase-index config                                      print generic mcpServers JSON
   codebase-index doctor                                      diagnose install / repo / client wiring
   codebase-index bench                                       tokens saved vs reading files, on your repo
@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("question")
 
     p = sub.add_parser("setup", help="configure an agent client for this repo")
-    p.add_argument("client", choices=("cursor", "claude-code", "vscode", "codex", "all"))
+    p.add_argument("client", choices=("cursor", "claude-code", "vscode", "codex", "antigravity", "all"))
     p.add_argument("--workspace", default=None, help="folder to write config into (default: the indexed repo)")
     p.add_argument("--name", default=None, help="MCP server name (default: codebase-index-<repo>)")
     p.add_argument("--model", default=None,

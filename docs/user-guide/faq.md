@@ -19,7 +19,7 @@ plus the config files `setup` creates.
 No. Install once per computer, then run `codebase-index setup <client>` in each project.
 
 **Which editors and agents work?**
-Cursor, Claude Code, VS Code with Copilot and Codex have one-command setup. Anything that can run an MCP
+Cursor, Claude Code, VS Code with Copilot, Codex and Google Antigravity have one-command setup. Anything that can run an MCP
 server works through `codebase-index config`. See [other clients](platforms/other-clients.md).
 
 **Which languages?**
