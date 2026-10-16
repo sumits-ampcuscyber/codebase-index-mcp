@@ -2,7 +2,7 @@
 
 Codex reads MCP servers from `[mcp_servers.<name>]` tables in your **global** `~/.codex/config.toml`, or from
 `.codex/config.toml` in a project (Codex only loads project config for trusted projects). `codebase-index`
-does not edit either file: it writes the repo-local instructions and prints the exact command or TOML to
+writes the repo-local instructions and can either write the project config or print the exact command/TOML to
 register the server.
 
 ## Set up
@@ -15,14 +15,22 @@ codebase-index setup codex
 
 1. It adds a short block to `AGENTS.md` (between `<!-- codebase-index:start/end -->` markers) that tells the
    agent to use the index before reading files. Codex reads `AGENTS.md` automatically.
-2. It prints a registration command. Run it (global, available in every project):
+2. Choose how to register the server.
+
+   For a project-local, one-command setup (the project must be trusted):
+
+   ```bash
+   codebase-index setup codex --codex-scope project
+   ```
+
+   This writes `.codex/config.toml` and preserves unrelated TOML content. Or let the default setup print a
+   registration command and run it globally, available in every project:
 
    ```bash
    codex mcp add codebase-index-myrepo --env CODEBASE_ROOT=/path/to/myrepo -- /path/to/python -m codebase_index.server
    ```
 
-   or paste the TOML it prints into `~/.codex/config.toml` (global), or into `.codex/config.toml` in the repo
-   to keep the server to that project (the project must be trusted):
+   You can also paste the TOML it prints into `~/.codex/config.toml` (global):
 
    ```toml
    [mcp_servers.codebase-index-myrepo]
@@ -31,12 +39,15 @@ codebase-index setup codex
    env = { CODEBASE_ROOT = "/path/to/myrepo" }
    ```
 
+   The project-scoped version is generated for you by `setup codex --codex-scope project`.
+
 3. Restart Codex. Use `/mcp` in the Codex TUI to confirm the server and its tools are listed.
 
 Each entry is per repo, so the name includes the repo name. With the global file, run Codex in the matching repo.
 
 Optional keys: `cwd`, `enabled`, `startup_timeout_sec` (default 10) and `tool_timeout_sec` (default 60). Raise
-`startup_timeout_sec` if the first start on a very large repo times out.
+`startup_timeout_sec` if the first start on a very large repo times out. `codebase-index doctor` checks both
+the project config and the usual user config when it can find a codebase-index entry.
 
 ## Use it
 

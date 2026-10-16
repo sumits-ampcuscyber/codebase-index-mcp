@@ -30,7 +30,8 @@ hundred tokens; opening a large file costs thousands and stays in context for th
 2. Open a whole file only when you are about to edit most of it.
 3. `find_callers` matches by **name**. When it warns about several definitions, check the receiver and
    files before refactoring.
-4. Markdown, SQL, YAML, JSON and other non-code files are not indexed; read them normally.
+4. Markdown, SQL, arbitrary JSON and other non-code files are not indexed; YAML and tsconfig/jsconfig expose
+   searchable key paths, but read their exact values normally.
 5. Save files before asking questions about them: unsaved editor buffers are not indexed.
 
 ## Subagent for multi-file exploration

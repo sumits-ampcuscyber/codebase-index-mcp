@@ -23,7 +23,9 @@ Cursor, Claude Code, VS Code with Copilot, Codex and Google Antigravity have one
 server works through `codebase-index config`. See [other clients](platforms/other-clients.md).
 
 **Which languages?**
-Python, JavaScript/JSX and TypeScript/TSX. Adding another is a contained change:
+Python, JavaScript/JSX, TypeScript/TSX, YAML, and TypeScript configuration (`tsconfig*.json` / `jsconfig.json`).
+YAML/config keys are searchable and shown in file outlines; values are read directly when needed. Adding another
+programming language is a contained change:
 [extending](../developers/extending.md).
 
 **Will it work on a huge repo?**

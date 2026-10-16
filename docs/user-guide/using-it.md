@@ -29,11 +29,12 @@ You can also say it outright: *"use the codebase index"* nudges any assistant to
 
 ## What it will not help with
 
-- Questions about Markdown, SQL, YAML, JSON or config files: those are not indexed, and the assistant
-  just reads them normally.
+- Questions about Markdown, SQL or arbitrary JSON: those are not indexed, and the assistant should read them
+  normally. YAML and tsconfig/jsconfig keys are indexed, while exact values should be read from the file.
 - "Why does this behave oddly at runtime?": the index knows structure, not behaviour. It gets the assistant
   to the right code fast; the assistant still has to read and reason about it.
-- Languages other than Python, JavaScript and TypeScript (for now).
+- Programming languages other than Python, JavaScript, TypeScript and YAML (for now); `tsconfig`/`jsconfig`
+  files are supported as structured configuration.
 
 ## Keeping it fresh
 

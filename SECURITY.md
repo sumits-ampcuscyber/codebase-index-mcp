@@ -34,8 +34,17 @@ repository profile. You will get an answer within a few days.
   `.env` and `~/.codebase-index.env` are read. Any key in the server's environment enables `summarize_file`,
   so set `CODEBASE_OFFLINE=1` (or leave the keys out of the server's environment) for code that must not
   leave the machine. Likely credentials are masked before a file is sent; treat that as a safety net only.
+- The local SQLite index and its WAL/SHM sidecars are tightened to owner-only permissions where the platform
+  supports Unix modes. Summary-cache rows expire after one day by default (`CODEBASE_SUMMARY_CACHE_TTL_SECONDS`);
+  set it to `0` to disable retention.
+- YAML/YML and `tsconfig*.json`/`jsconfig.json` keys remain searchable, while credential-looking values are
+  stored as `<redacted>` in SQLite. Safe values remain available for understanding configuration structure.
+- `summarize_file` applies the same field-aware redaction to quoted and unquoted YAML/config values before an
+  optional provider call. `CODEBASE_OFFLINE=1` remains the hard control for keeping all code local.
 - `codebase-index setup` writes only inside the workspace. It refuses to write through symlinks that leave
-  the workspace, and it never edits global client configs. Git hook lines are shell-quoted.
+  the workspace, uses an atomic replacement for generated files, and it never edits global client configs.
+- Git hook installation rejects an absolute or resolved `core.hooksPath` outside the repository/Git metadata
+  directory, refuses symlink/junction components, and atomically replaces hook files without following a link.
 
 The server's instructions tell the agent that tool results are data, not instructions. That is a hint to
 the model, not a security boundary. Treat answers from the index as untrusted data when the repo itself is

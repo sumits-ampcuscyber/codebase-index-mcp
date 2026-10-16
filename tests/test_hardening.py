@@ -110,8 +110,54 @@ class OfflineAndRedactionTest(_RepoCase):
         self.assertNotIn("s3cretpass", out[5])
         self.assertEqual(n, 2)
 
+    def test_redact_masks_unquoted_yaml_and_keeps_safe_values(self):
+        src = ["apiVersion: v1", "metadata:", "  name: demo", "  password: abc123",
+               "  api_key: unquoted-secret", "  image: example/api:latest"]
+        out, n = cheap_delegate.redact(src)
+        joined = "\n".join(out)
+        self.assertNotIn("abc123", joined)
+        self.assertNotIn("unquoted-secret", joined)
+        self.assertIn("name: demo", joined)
+        self.assertIn("image: example/api:latest", joined)
+        self.assertGreaterEqual(n, 2)
+
+    def test_summary_cache_expires(self):
+        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "fake"}), \
+                mock.patch.object(cheap_delegate, "_ask_gemini", side_effect=["one", "two"]) as ask:
+            cheap_delegate.summarize_file("creds.py", "what?")
+            con = indexer.db()
+            con.execute("UPDATE summary_cache SET created=0")
+            con.commit()
+            with mock.patch.object(config, "SUMMARY_CACHE_TTL_SECONDS", 60):
+                out = cheap_delegate.summarize_file("creds.py", "what?")
+        self.assertIn("two", out)
+        self.assertEqual(ask.call_count, 2)
+
+    def test_refresh_stops_at_total_byte_budget(self):
+        with mock.patch.object(config, "MAX_TOTAL_FILE_BYTES", 1):
+            stats = indexer.refresh(full=True)
+        self.assertGreater(stats["skipped_budget"], 0)
+        self.assertEqual(stats["reindexed"], 0)
+
+    @unittest.skipUnless(os.name != "nt", "Unix mode bits are not Windows ACLs")
+    def test_local_index_permissions_are_private(self):
+        con = indexer.db()
+        con.execute("SELECT 1")
+        self.assertEqual(stat.S_IMODE(os.stat(config.DB_DIR).st_mode), 0o700)
+        self.assertEqual(stat.S_IMODE(os.stat(config.DB_PATH).st_mode), 0o600)
+
 
 class HookCoalescingTest(_RepoCase):
+    def test_hooks_reject_external_core_hookspath(self):
+        def git_run(cmd, **kwargs):
+            value = str(self.root / ".git") if "--git-dir" in cmd else str(self.outside / "hooks")
+            return subprocess.CompletedProcess(cmd, 0, stdout=value + "\n", stderr="")
+
+        with mock.patch.object(config, "git_exe", return_value="git"), \
+                mock.patch.object(hooks.subprocess, "run", side_effect=git_run):
+            with self.assertRaises(SystemExit):
+                hooks.hooks_dir()
+
     def test_many_hooks_start_one_worker_that_reruns_once(self):
         with mock.patch.object(hooks.subprocess, "Popen") as popen:
             for _ in range(20):  # e.g. a 20-commit rebase

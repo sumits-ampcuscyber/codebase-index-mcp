@@ -64,5 +64,6 @@ re-sent on every turn. For a very short session on a tiny repo it can be a net c
 ## What it does not do
 
 It does not shrink your own prompts, the model's output, or the content of files the agent reads anyway
-(configs, Markdown, SQL, YAML, JSON are not indexed). It reduces the cost of *navigating* code, which is
+(arbitrary JSON, Markdown, and SQL are not indexed; YAML and TypeScript config are indexed as key paths).
+It reduces the cost of *navigating* code, which is
 usually the largest share of an agent's input.

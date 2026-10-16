@@ -75,6 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", default=None,
                    help="subagent model: Cursor model id (default grok-4.7) or Claude Code alias (default haiku)")
     p.add_argument("--no-subagent", action="store_true", help="do not install the codebase-explorer subagent")
+    p.add_argument("--codex-scope", choices=("command", "project"), default="command",
+                   help="Codex registration: print a command (default) or write trusted-project .codex/config.toml")
     p.add_argument("--dry-run", action="store_true", help="show what would change")
     p = sub.add_parser("config", help="print generic mcpServers JSON for any other MCP client")
     p.add_argument("--name", default=None)

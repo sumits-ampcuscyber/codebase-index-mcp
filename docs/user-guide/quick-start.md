@@ -46,13 +46,12 @@ Go to the folder of the project you open in your editor, then run the line for y
 ```bash
 cd path/to/your-project
 
-codebase-index setup cursor         # Cursor
-codebase-index setup claude-code    # Claude Code
-codebase-index setup vscode         # VS Code with GitHub Copilot
-codebase-index setup codex          # OpenAI Codex
-codebase-index setup antigravity    # Google Antigravity
-codebase-index setup all            # all of the above
+codebase-index setup all --codex-scope project  # Cursor, Claude, VS Code, Codex, and Antigravity
 ```
+
+Or configure only one client: `setup cursor`, `setup claude-code`, `setup vscode`, or `setup codex`.
+The Codex project option writes `.codex/config.toml`; omit `--codex-scope project` if you prefer the
+default printed `codex mcp add` command for a global registration.
 
 It prints each file it wrote. It never deletes your existing settings, and running it twice is harmless.
 Use `--dry-run` first if you want to see what it would do without changing anything.
@@ -74,8 +73,8 @@ Restart the editor (or reload the window) so it picks up the new server, then fo
 |---|---|
 | Cursor | Settings → MCP: the server has a green dot and 12 tools |
 | Claude Code | Type `/mcp` in a session in your project; approve the server if asked |
-| VS Code | Command Palette → "MCP: List Servers" → start it; use Copilot Chat in **Agent** mode |
-| Codex | Run the `codex mcp add ...` command that `setup codex` printed, then restart Codex |
+| VS Code | Trust the folder, reload, then use "MCP: List Servers"; use Copilot Chat in **Agent** mode |
+| Codex | If using project scope, trust the folder and restart; otherwise run the printed `codex mcp add ...` command |
 | Antigravity | Type `/mcp` in the Antigravity CLI and reload, or click refresh under Installed MCP Servers |
 
 Now ask your assistant:

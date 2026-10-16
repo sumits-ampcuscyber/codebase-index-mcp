@@ -6,8 +6,8 @@ first makes sure the index is fresh. The same queries are available in a termina
 | Tool | CLI | Arguments |
 |---|---|---|
 | `repo_map` | `map [path]` | `path=""`, `limit=30` |
-| `search_symbol` | `search "<q>"` | `query`, `kind=""` (function\|method\|class\|interface\|type\|enum\|variable), `limit=20` |
-| `get_file_summary` | `summary <file>` | `file`, `depth=1` (2 shows nested functions) |
+| `search_symbol` | `search "<q>"` | `query`, `kind=""` (function\|method\|class\|interface\|type\|enum\|variable\|key), `limit=20` |
+| `get_file_summary` | `summary <file>` | `file`, `depth=1` (2 shows nested functions or config keys) |
 | `get_exports` | `exports <file>` | `file` |
 | `read_symbol_source` | `source <symbols>` | `file=""`, `symbol=""`, `line_start=0`, `line_end=0`, `mode="auto"` (auto\|full\|skeleton) |
 | `find_callers` | `callers <symbol>` | `symbol`, `receiver=""`, `depth=1` (up to 3), `limit=30` |
@@ -41,6 +41,9 @@ L10-22 *class UserService  # Manages users.
 L25-28 *def list_users(user_id: int)
 L31-32 def _private()
 (+1 deeper nested symbols; pass depth=2 to show)
+
+For structured configuration, use the same tools: `search_symbol("replicas", kind="key")` finds a YAML key,
+and `get_file_summary("tsconfig.json")` shows the TypeScript configuration outline.
 
 > find_callers("check", depth=2)
 callers of check: 1 call sites in 1 files

@@ -5,6 +5,11 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 ## [Unreleased]
 
 ### Security
+- Git hook installation now rejects external or linked `core.hooksPath` targets and atomically replaces hooks.
+- YAML/YML and TypeScript-config credential-looking values are redacted before entering the SQLite index;
+  optional provider redaction now also covers unquoted YAML/config fields.
+- The local index uses owner-only file modes where supported, summary-cache entries expire by default, and
+  refreshes have total-byte and time budgets.
 - git fsmonitor command execution blocked (`core.fsmonitor=false`, `safe.bareRepository=explicit`), so a repo's own `.git/config` cannot run commands.
 - File reads restricted to indexed files: `read_symbol_source` line ranges and `summarize_file` no longer reach untracked or ignored files such as `.env`.
 - Symlinks and Windows junctions are refused in every path component, including links that stay inside the repo (an in-repo `visible.py -> .env` link could expose an ignored secret, and git on Windows lists files inside a junction to another folder). Only regular files are read; a symlinked index folder or database is refused.
@@ -25,6 +30,9 @@ All notable changes. Format: [Keep a Changelog](https://keepachangelog.com), ver
 - `codebase-index setup antigravity`: writes `.agents/mcp_config.json` and the `AGENTS.md` instruction block. `setup all` includes it.
 - `codebase-index doctor` checks `.agents/mcp_config.json`.
 - Platform guide for Google Antigravity.
+- `setup codex --codex-scope project`: writes an idempotent, marked `.codex/config.toml` block for trusted projects.
+- `setup vscode` now uses the portable workspace `.mcp.json` format, which can be shared with Claude Code and Copilot harness sessions.
+- YAML/YML files and `tsconfig*.json` / `jsconfig.json` are indexed for searchable configuration keys and file outlines.
 
 ### Changed
 - `setup cursor` writes `"type": "stdio"` in its `.cursor/mcp.json` entry.

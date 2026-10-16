@@ -59,7 +59,8 @@ repo root, the index, and whether each client's config points at a Python that e
 - **Route prefixes** from `include_router(..., prefix=)` / `app.use("/api", router)` are not added; the router's own `APIRouter(prefix=...)` is.
 - **No types or semantics.** That is what `summarize_file` and the subagents are for.
 - **Unsaved editor buffers** are invisible.
-- **Three languages today:** Python, JavaScript/JSX, TypeScript/TSX ([add one](../developers/extending.md)).
+- **Indexed file types today:** Python, JavaScript/JSX, TypeScript/TSX, YAML/YML, and `tsconfig*.json` / `jsconfig.json`.
+  YAML and TypeScript config files expose searchable keys, not runtime semantics ([add a language](../developers/extending.md)).
 
 Still stuck? [Open an issue](https://github.com/sumits-ampcuscyber/codebase-index-mcp/issues) and paste the output
 of `codebase-index doctor` (it contains paths, so redact if needed).

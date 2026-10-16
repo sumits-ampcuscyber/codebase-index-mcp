@@ -21,6 +21,8 @@ empty values are ignored.
 | `CODEBASE_ROOT` | git root of the current directory | Absolute path of the repo to index. `setup` writes it into the MCP config |
 | `CODEBASE_WATCH_INTERVAL` | `2` | Seconds between background re-scans while the server runs; `0` = off |
 | `CODEBASE_MAX_FILE_BYTES` | `1000000` | Skip files larger than this |
+| `CODEBASE_MAX_TOTAL_FILE_BYTES` | `268435456` | Maximum source bytes considered during one refresh; `0` = unlimited |
+| `CODEBASE_MAX_SYNC_SECONDS` | `120` | Maximum refresh discovery/parse budget in seconds; `0` = unlimited |
 | `CODEBASE_EXCLUDE_DIRS` | none | Extra folder names to skip (comma-separated) |
 | `CODEBASE_INDEX_WORKERS` | CPUs − 1 (max 8) | Parser processes for big (2,000+ file) index runs; `1` = in-process |
 | `CODEBASE_INDEX_ENV` | none | Path of an extra `.env` file to load |
@@ -29,12 +31,18 @@ empty values are ignored.
 | `ANTHROPIC_API_KEY` | none | Enables `summarize_file` with Claude (default `claude-haiku-4-5`; needs `pip install anthropic`) |
 | `CHEAP_MODEL_PROVIDER`, `CHEAP_MODEL` | auto | Choose provider (`gemini`/`anthropic`) and model for `summarize_file` |
 | `CODEBASE_OFFLINE` | off | `1` disables `summarize_file` even when a key is set: no code leaves the machine |
+| `CODEBASE_SUMMARY_CACHE_TTL_SECONDS` | `86400` | Local summary-cache retention; `0` disables cache retention |
 
-`summarize_file` answers are cached by (file content, line range, question, model). Without a key every other
-tool works and `summarize_file` replies with a clear "no key" message. Before anything is sent, likely
-credentials (cloud and GitHub tokens, `password = "..."`-style assignments, passwords in URLs, private-key
+`summarize_file` answers are cached locally by (file content, line range, question, model) and expire after
+`CODEBASE_SUMMARY_CACHE_TTL_SECONDS`. Without a key every other tool works and `summarize_file` replies with
+a clear "no key" message. Before anything is sent, likely credentials (cloud and GitHub tokens, quoted or
+unquoted YAML/config secret fields such as `password:` and `api_key:`, passwords in URLs, and private-key
 blocks) are masked line by line, and the answer says how many were masked. Masking is a safety net, not a
 guarantee: set `CODEBASE_OFFLINE=1` for code that must not leave the machine.
+
+YAML and TypeScript-config values are kept selectively in the local index so safe values such as `replicas: 2`
+and `baseUrl: "."` remain useful. Credential-looking fields are stored as `<redacted>`; the exact local file
+is still available through the normal indexed-file source tools when you need to inspect it.
 
 ## What is indexed
 

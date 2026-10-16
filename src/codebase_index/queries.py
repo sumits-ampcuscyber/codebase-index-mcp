@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from pathlib import PurePosixPath
 
 from . import config
 from . import indexer
@@ -473,7 +472,7 @@ def _node_for_range(root, r0: int, r1: int):
 
 
 def _skeleton(rel: str, data: bytes, lines: list[str], a: int, b: int, fold: int):
-    lang = config.LANG_BY_EXT.get(PurePosixPath(rel).suffix.lower(), "")
+    lang = config.language_for_path(rel)
     parser = indexer.get_parser(lang)
     if parser is None:
         return None

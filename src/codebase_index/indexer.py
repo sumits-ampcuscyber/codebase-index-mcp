@@ -20,6 +20,7 @@ from collections import namedtuple
 from pathlib import Path, PurePosixPath
 
 from . import config, safefs
+from .redaction import config_value_preview
 
 SCHEMA_VERSION = "2"
 
@@ -88,13 +89,37 @@ def _init_schema(con: sqlite3.Connection) -> None:
 
 def ensure_db_dir() -> None:
     """Create <repo>/.codebase-index (it git-ignores itself); refuse a symlinked or out-of-repo folder."""
-    if config.DB_DIR.is_symlink() or config.DB_PATH.is_symlink() \
+    paths = (config.DB_DIR, config.DB_PATH, config.DB_PATH.with_name("index.db-wal"),
+             config.DB_PATH.with_name("index.db-shm"))
+    if any(_is_link(path) for path in paths) \
             or not config.DB_DIR.resolve().is_relative_to(config.REPO_ROOT):
         raise RuntimeError(f"refusing to use {config.DB_DIR}: it is a symlink or outside the repo")
     config.DB_DIR.mkdir(parents=True, exist_ok=True)
+    if any(_is_link(path) for path in paths) \
+            or not config.DB_DIR.resolve().is_relative_to(config.REPO_ROOT):
+        raise RuntimeError(f"refusing to use {config.DB_DIR}: it changed to a symlink or outside the repo")
+    _private_mode(config.DB_DIR, 0o700)
     gi = config.DB_DIR / ".gitignore"
+    if _is_link(gi):
+        raise RuntimeError(f"refusing to use symlinked database sidecar: {gi}")
     if not gi.exists():
         gi.write_text("*\n", encoding="utf-8")
+    _private_mode(gi, 0o600)
+
+
+def _is_link(path: Path) -> bool:
+    try:
+        return safefs._is_link(os.lstat(path))
+    except FileNotFoundError:
+        return False
+
+
+def _private_mode(path: Path, mode: int) -> None:
+    """Best-effort owner-only permissions; Windows ACLs remain the platform authority."""
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
 
 
 def connect() -> sqlite3.Connection:
@@ -109,6 +134,14 @@ def connect() -> sqlite3.Connection:
             if key not in _schema_ready:
                 _init_schema(con)
                 _schema_ready.add(key)
+    # SQLite may create these lazily (especially WAL files), so tighten all of them after setup.
+    for path in (config.DB_PATH, config.DB_PATH.with_name("index.db-wal"),
+                 config.DB_PATH.with_name("index.db-shm")):
+        if path.exists():
+            if _is_link(path):
+                con.close()
+                raise RuntimeError(f"refusing to use symlinked database file: {path}")
+            _private_mode(path, 0o600)
     return con
 
 
@@ -181,9 +214,9 @@ def repo_files() -> list[str]:
 
 
 def iter_source_files(all_files: list[str] | None = None):
-    """Yield repo-relative posix paths of supported source files."""
+    """Yield repo-relative posix paths of supported source and configuration files."""
     for rel in (repo_files() if all_files is None else all_files):
-        if PurePosixPath(rel).suffix.lower() in config.LANG_BY_EXT:
+        if config.language_for_path(rel):
             yield rel
 
 
@@ -211,6 +244,9 @@ def get_parser(lang: str):
         elif lang == "tsx":
             import tree_sitter_typescript as m
             language = Language(m.language_tsx())
+        elif lang == "yaml":
+            import tree_sitter_yaml as m
+            language = Language(m.language())
         if language is not None:
             parser = Parser(language)
     except Exception as e:  # missing grammar package etc.
@@ -742,15 +778,91 @@ def _is_binary(data: bytes) -> bool:
     return b"\x00" in data[:8192]
 
 
+class ConfigExtractor:
+    """Expose YAML and TypeScript-config keys as searchable, line-addressable symbols."""
+
+    def __init__(self, lang: str, src: bytes):
+        self.lang = lang
+        self.src = src
+        self.text = src.decode("utf-8", "replace")
+        self.symbols: list[tuple] = []
+        self._json_cursor = 0
+
+    def _add(self, name: str, parent: str | None, start: int, end: int, signature: str) -> None:
+        if not name:
+            return
+        self.symbols.append((name, "key", parent, start + 1, end + 1, signature[:300],
+                             1 if parent is None else 0, None))
+
+    def _yaml_text(self, node) -> str:
+        return self.src[node.start_byte:node.end_byte].decode("utf-8", "replace")
+
+    def _visit_yaml(self, node, parent: str | None) -> None:
+        if node is None:
+            return
+        if node.type in {"block_mapping_pair", "flow_pair", "pair"}:
+            key = node.child_by_field_name("key")
+            value = node.child_by_field_name("value")
+            if key is not None:
+                name = self._yaml_text(key).strip().strip("'\"")
+                value_text = (config_value_preview(name, parent, self._yaml_text(value))
+                              if value is not None else "")
+                end_node = value if value is not None else node
+                self._add(name, parent, node.start_point[0], end_node.end_point[0],
+                          f"{name}: {value_text}".rstrip())
+                self._visit_yaml(value, f"{parent}.{name}" if parent else name)
+                return
+        for child in node.named_children:
+            self._visit_yaml(child, parent)
+
+    def _visit_json(self, value, parent: str | None) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                literal = json.dumps(str(key), ensure_ascii=False)
+                match = re.search(re.escape(literal) + r"\s*:", self.text[self._json_cursor:])
+                if match is None:
+                    continue
+                start = self._json_cursor + match.start()
+                self._json_cursor = self._json_cursor + match.end()
+                line = self.text.count("\n", 0, start)
+                preview = config_value_preview(str(key), parent,
+                                                json.dumps(child, ensure_ascii=False, separators=(",", ":")))
+                self._add(str(key), parent, line, line, f"{key}: {preview}".rstrip())
+                self._visit_json(child, f"{parent}.{key}" if parent else str(key))
+        elif isinstance(value, list):
+            for child in value:
+                self._visit_json(child, parent)
+
+    def run(self, root=None):
+        if self.lang == "yaml":
+            self._visit_yaml(root, None)
+        else:
+            try:
+                self._visit_json(_load_jsonc(self.text), None)
+            except Exception:
+                pass
+
+    def result(self):
+        return self.symbols, [], [], []
+
+
 def parse_source(lang: str, data: bytes):
     """Return (symbols, imports, calls, routes) or None. Pure: safe to run in a worker process."""
     if _is_binary(data):
         return None
+    if lang == "typescript-config":
+        ex = ConfigExtractor(lang, data)
+        ex.run()
+        return ex.result()
     parser = get_parser(lang)
     if parser is None:
         return None
-    ex = Extractor(lang, data)
-    ex.run(parser.parse(data).root_node)
+    if lang == "yaml":
+        ex = ConfigExtractor(lang, data)
+        ex.run(parser.parse(data).root_node)
+    else:
+        ex = Extractor(lang, data)
+        ex.run(parser.parse(data).root_node)
     return ex.result()
 
 
@@ -788,7 +900,7 @@ def _write_file(con: sqlite3.Connection, rel: str, lang: str, data: bytes, diges
 
 
 def index_file(con: sqlite3.Connection, rel: str, data: bytes, digest: str, st: os.stat_result) -> None:
-    lang = config.LANG_BY_EXT.get(PurePosixPath(rel).suffix.lower(), "")
+    lang = config.language_for_path(rel)
     rel_, result, err = _parse_job((rel, lang, data))
     if err:
         log(f"parse error in {rel}: {err}")
@@ -819,18 +931,35 @@ def sync(full: bool = False) -> dict:
     try:
         known = {r["path"]: r for r in con.execute("SELECT path, hash, mtime, size FROM files")}
         seen: set[str] = set()
-        stats = {"scanned": 0, "reindexed": 0, "removed": 0, "skipped_large": 0}
+        stats = {"scanned": 0, "reindexed": 0, "removed": 0, "skipped_large": 0,
+                 "skipped_budget": 0}
+        started = time.monotonic()
+        deadline = (started + config.MAX_SYNC_SECONDS) if config.MAX_SYNC_SECONDS > 0 else None
         all_files = repo_files()
         todo, dirs = [], {}
+        scan_complete = True
+        total_bytes = 0
         for rel in iter_source_files(all_files):
+            if deadline is not None and time.monotonic() >= deadline:
+                stats["skipped_budget"] += 1
+                scan_complete = False
+                break
             st = safefs.lstat_file(rel, dirs)  # None for links (symlink/junction) anywhere in the path
             if st is None:
                 continue
             stats["scanned"] += 1
+            seen.add(rel)
             if st.st_size > config.MAX_FILE_BYTES:
                 stats["skipped_large"] += 1
                 continue
-            seen.add(rel)
+            if deadline is not None and time.monotonic() >= deadline:
+                stats["skipped_budget"] += 1
+                continue
+            if (config.MAX_TOTAL_FILE_BYTES > 0
+                    and total_bytes + st.st_size > config.MAX_TOTAL_FILE_BYTES):
+                stats["skipped_budget"] += 1
+                continue
+            total_bytes += st.st_size
             row = known.get(rel)
             if not full and row and row["mtime"] == st.st_mtime_ns and row["size"] == st.st_size:
                 continue
@@ -838,6 +967,9 @@ def sync(full: bool = False) -> dict:
 
         pool = _make_pool(len(todo))
         for i in range(0, len(todo), _BATCH):
+            if deadline is not None and time.monotonic() >= deadline:
+                stats["skipped_budget"] += len(todo) - i
+                break
             jobs, meta = [], {}
             for rel, st, row in todo[i:i + _BATCH]:
                 data = safefs.read_bytes(rel, config.MAX_FILE_BYTES)  # re-checked on the descriptor it reads
@@ -848,7 +980,7 @@ def sync(full: bool = False) -> dict:
                 if not full and row and row["hash"] == digest:
                     con.execute("UPDATE files SET mtime=?, size=? WHERE path=?", (st.st_mtime_ns, st.st_size, rel))
                     continue
-                lang = config.LANG_BY_EXT.get(PurePosixPath(rel).suffix.lower(), "")
+                lang = config.language_for_path(rel)
                 jobs.append((rel, lang, data))
                 meta[rel] = (lang, data, digest, st)
             results = pool.map(_parse_job, jobs, chunksize=8) if pool else map(_parse_job, jobs)
@@ -859,11 +991,12 @@ def sync(full: bool = False) -> dict:
                 _write_file(con, rel, lang, data, digest, st, result)
                 stats["reindexed"] += 1
 
-        for rel in set(known) - seen:
-            for table in _PER_FILE_TABLES:
-                con.execute(f"DELETE FROM {table} WHERE file=?", (rel,))
-            con.execute("DELETE FROM files WHERE path=?", (rel,))
-            stats["removed"] += 1
+        if scan_complete:
+            for rel in set(known) - seen:
+                for table in _PER_FILE_TABLES:
+                    con.execute(f"DELETE FROM {table} WHERE file=?", (rel,))
+                con.execute("DELETE FROM files WHERE path=?", (rel,))
+                stats["removed"] += 1
 
         if stats["reindexed"] or stats["removed"] or full \
                 or con.execute("SELECT value FROM meta WHERE key='deps_built'").fetchone() is None:
@@ -924,7 +1057,7 @@ def _ts_alias_rules(all_files: list[str]) -> list[tuple]:
     rules = []
     for rel in all_files:
         base = posixpath.basename(rel)
-        if not ((base.startswith("tsconfig") and base.endswith(".json")) or base == "jsconfig.json"):
+        if not config.is_typescript_config(rel):
             continue
         raw = safefs.read_bytes(rel, config.MAX_FILE_BYTES)
         if raw is None:

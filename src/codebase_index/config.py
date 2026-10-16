@@ -11,7 +11,7 @@ from __future__ import annotations
 import functools
 import os
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 # The project folder when running from a clone (src/codebase_index -> project); None when pip-installed.
@@ -81,6 +81,27 @@ LANG_BY_EXT = {
     ".tsx": "tsx",
 }
 
+
+def is_typescript_config(rel: str) -> bool:
+    """Return whether a repo-relative path is a tsconfig/jsconfig JSON file."""
+    path = PurePosixPath(rel)
+    name = path.name.lower()
+    return ((name.startswith("tsconfig") and path.suffix.lower() in {".json", ".jsonc"})
+            or name in {"jsconfig.json", "jsconfig.jsonc"})
+
+
+def language_for_path(rel: str) -> str:
+    """Classify an indexable source or configuration file by its repo-relative path."""
+    path = PurePosixPath(rel)
+    suffix = path.suffix.lower()
+    if suffix in LANG_BY_EXT:
+        return LANG_BY_EXT[suffix]
+    if suffix in {".yaml", ".yml"}:
+        return "yaml"
+    if is_typescript_config(rel):
+        return "typescript-config"
+    return ""
+
 # Generated reports under common names stay out because git ls-files respects .gitignore.
 EXCLUDE_DIRS = {
     "node_modules", ".git", ".venv", "venv", "__pycache__", "dist", "build", ".next", ".nuxt",
@@ -119,6 +140,12 @@ def git_exe() -> str | None:
     return _find_git(os.environ.get("PATH", ""), str(REPO_ROOT))
 
 MAX_FILE_BYTES = int(os.environ.get("CODEBASE_MAX_FILE_BYTES", "1000000"))
+# Bounds the amount of repository content one refresh will read/parse. Existing indexed files are kept
+# when a refresh reaches the budget; set to 0 to disable the total budget explicitly.
+MAX_TOTAL_FILE_BYTES = int(os.environ.get("CODEBASE_MAX_TOTAL_FILE_BYTES", str(256 * 1024 * 1024)))
+MAX_SYNC_SECONDS = float(os.environ.get("CODEBASE_MAX_SYNC_SECONDS", "120"))
+# Summary answers can contain sensitive context; keep the local cache short-lived by default.
+SUMMARY_CACHE_TTL_SECONDS = int(os.environ.get("CODEBASE_SUMMARY_CACHE_TTL_SECONDS", str(24 * 60 * 60)))
 
 # Seconds between background re-scans while the MCP server runs; 0 turns the watcher off.
 WATCH_INTERVAL = float(os.environ.get("CODEBASE_WATCH_INTERVAL", "2"))

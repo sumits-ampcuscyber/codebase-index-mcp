@@ -11,7 +11,7 @@ parser, stores them in SQLite, and serves them over MCP.
 
 | Piece | Choice | Why |
 |---|---|---|
-| Parsing | [tree-sitter](https://tree-sitter.github.io/) (`tree-sitter-python`, `-javascript`, `-typescript`) | Real syntax trees, fast, error-tolerant, no LLM, no network |
+| Parsing | [tree-sitter](https://tree-sitter.github.io/) (`tree-sitter-python`, `-javascript`, `-typescript`, `-yaml`) | Real syntax trees, fast, error-tolerant, no LLM, no network |
 | Storage | SQLite in WAL mode, one file per repo | Zero setup, fast indexed lookups, safe concurrent readers |
 | Protocol | [MCP](https://modelcontextprotocol.io) over stdio (`mcp` SDK 2.x, `MCPServer`) | Works in every major agent client |
 | File discovery | `git ls-files` + `stat` | Respects `.gitignore` for free; a stat scan of 749 files takes 0.16 s |
@@ -66,7 +66,7 @@ flowchart LR
    the content, so touching a file without changing it costs nothing.
 3. **Parse** only real changes. Runs with 2,000+ changed files use a process pool; smaller runs parse
    in-process (process start-up would cost more than it saves).
-4. **Extract** per language (see below) into rows.
+4. **Extract** per language/config type (see below) into rows.
 5. **Resolve imports** into `deps` (file → file), including relative paths, tsconfig `paths`/`baseUrl`, and
    Python packages.
 6. **Serve**. Queries use a per-thread read connection; all writers share one lock, so the watcher, tool
@@ -74,15 +74,16 @@ flowchart LR
 
 ## What the parser extracts
 
-| | Python | JavaScript / TypeScript / TSX |
-|---|---|---|
-| Symbols | classes, methods, functions, **nested functions** (parent = `Class.method` / `outer`), module-level variables | functions, classes, methods, class-field arrows, `const X = () => ...`, `memo`/`forwardRef`/`useCallback`/`useMemo` wrappers, **object-literal methods** (`api.getX`), interfaces, types, enums, exported variables, `export default` (named or anonymous) |
-| Exported | not `_`-prefixed; `__all__` wins when present | `export`, `export { a }`, `export default X` / `memo(X)` |
-| Docs | first line of the docstring | first line of the adjacent `/** */` or `//` comment |
-| Imports | `import a.b`, `from .x import y`, `from pkg import mod` | `import`, `export ... from`, `require()`, dynamic `import()` |
+| | Python | JavaScript / TypeScript / TSX | YAML / tsconfig / jsconfig |
+|---|---|---|---|
+| Symbols | classes, methods, functions, **nested functions** (parent = `Class.method` / `outer`), module-level variables | functions, classes, methods, class-field arrows, `const X = () => ...`, `memo`/`forwardRef`/`useCallback`/`useMemo` wrappers, **object-literal methods** (`api.getX`), interfaces, types, enums, exported variables, `export default` (named or anonymous) | Not applicable |
+| Exported | not `_`-prefixed; `__all__` wins when present | `export`, `export { a }`, `export default X` / `memo(X)` | Top-level keys |
+| Docs | first line of the docstring | first line of the adjacent `/** */` or `//` comment | Not applicable |
+| Imports | `import a.b`, `from .x import y`, `from pkg import mod` | `import`, `export ... from`, `require()`, dynamic `import()` | Not applicable |
 | Import resolution | relative imports, packages (`__init__.py`), namespace packages, source roots inferred from the importer's location | relative paths, extension/`index` probing, `.js`→`.ts`, tsconfig/jsconfig `paths` + `baseUrl` (comments and trailing commas allowed) |
-| Calls | callee + receiver + enclosing function; bare built-ins (`len`, `str`, ...) skipped | callee + receiver + enclosing function, `new X()`; JS globals (`setTimeout`, `Promise`, ...) skipped |
-| Routes | `@router.get("/x")`, `@app.post`, `api_route`, Flask `route(methods=[...])`, `websocket`; `APIRouter(prefix=)` / `Blueprint(url_prefix=)` applied | `app.get("/x", handler)`, `router.post(...)`, `*Router.get(...)` |
+| Calls | callee + receiver + enclosing function; bare built-ins (`len`, `str`, ...) skipped | callee + receiver + enclosing function, `new X()`; JS globals (`setTimeout`, `Promise`, ...) skipped | Not applicable |
+| Routes | `@router.get("/x")`, `@app.post`, `api_route`, Flask `route(methods=[...])`, `websocket`; `APIRouter(prefix=)` / `Blueprint(url_prefix=)` applied | `app.get("/x", handler)`, `router.post(...)`, `*Router.get(...)` | Not applicable |
+| Keys | Not applicable | Not applicable | Mapping keys become `key` symbols with dotted parents and line ranges; values are read from disk when needed |
 
 ## Data model
 
@@ -170,13 +171,18 @@ for worktrees and packed refs. Blind spot: **unsaved editor buffers**.
 - The AST walk visits only named nodes and skips subtrees that cannot contain symbols (strings, comments, type
   annotations): a 749-file full index went from 10.9 s to 3.3 s. Re-check with nothing changed: 0.16 s.
 - Queries use per-thread SQLite connections and indexes on name, file, parent, caller, callee and dependency target.
-- Files over `CODEBASE_MAX_FILE_BYTES` (1 MB) and binary files are skipped.
+- Files over `CODEBASE_MAX_FILE_BYTES` (1 MB) and binary files are skipped. A refresh also stops considering
+  new files after `CODEBASE_MAX_TOTAL_FILE_BYTES` (256 MB) or `CODEBASE_MAX_SYNC_SECONDS` (120 s); existing
+  index rows are retained for files skipped by those budgets.
 
 ## Privacy and security
 
 - Everything except `summarize_file` is local: no network calls, nothing leaves your machine.
 - `summarize_file` sends the selected file (or line range) to the provider of the API key you configured.
-  Leave the keys empty to stay fully offline.
+  Credential-looking YAML/config fields and common token formats are masked first. Leave the keys empty or
+  set `CODEBASE_OFFLINE=1` to stay fully offline.
+- The local SQLite database stores structural facts and redacted configuration previews. Its cache expires by
+  default and the database files use owner-only permissions where supported.
 - The server is read-only with respect to your source code: it never writes inside your repo except its own
   `.codebase-index/` folder. `read_symbol_source` and `summarize_file` refuse paths outside the repo root.
 - API keys are read from the environment / `.env` files and are never logged or written to the index.

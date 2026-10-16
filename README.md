@@ -10,7 +10,7 @@ small local index of your project, so the assistant can ask *"where is `UserServ
 - **Free and private.** It uses a code parser, not an AI model. Nothing leaves your machine.
 - **Works with your editor.** Cursor, Claude Code, VS Code (Copilot), Codex, Google Antigravity, and any MCP client.
 - **Set up in one command**, per project. Stays up to date on its own.
-- Supports **Python, JavaScript / JSX, TypeScript / TSX**.
+- Supports **Python, JavaScript / JSX, TypeScript / TSX, YAML, and TypeScript configuration** (`tsconfig*.json` / `jsconfig.json`).
 
 ## What it saves
 
@@ -43,10 +43,21 @@ pipx install git+https://github.com/sumits-ampcuscyber/codebase-index-mcp.git
 
 ```bash
 cd path/to/your-project
-codebase-index setup cursor        # or: claude-code | vscode | codex | antigravity | all
+codebase-index setup all --codex-scope project
 ```
 
-**3. Restart your editor and ask:**
+This configures Cursor, Claude Code, VS Code/Copilot, Codex, and the optional Antigravity wiring in one pass.
+If you only use one client, replace `all` with `cursor`, `claude-code`, `vscode`, or `codex`.
+For Codex, `--codex-scope project` writes `.codex/config.toml`; without it, setup prints the `codex mcp add`
+command instead.
+
+**3. Check the wiring and restart your editor:**
+
+```bash
+codebase-index doctor
+```
+
+Then ask:
 
 > *"Use the codebase index to find where `<something>` is defined and show me its code."*
 
@@ -58,13 +69,14 @@ That is the whole thing. Check the wiring any time with `codebase-index doctor`.
 |---|---|---|
 | **Cursor** | MCP server, an always-on rule, a cheap read-only `codebase-explorer` subagent | [Cursor](docs/user-guide/platforms/cursor.md) |
 | **Claude Code** | `.mcp.json`, a `CLAUDE.md` block, a Haiku `codebase-explorer` subagent | [Claude Code](docs/user-guide/platforms/claude-code.md) |
-| **VS Code (Copilot)** | `.vscode/mcp.json`, a `copilot-instructions.md` block | [VS Code](docs/user-guide/platforms/vscode-copilot.md) |
-| **Codex** | an `AGENTS.md` block, plus the command to register the server | [Codex](docs/user-guide/platforms/codex.md) |
+| **VS Code (Copilot)** | portable `.mcp.json`, a `copilot-instructions.md` block | [VS Code](docs/user-guide/platforms/vscode-copilot.md) |
+| **Codex** | an `AGENTS.md` block, plus optional project `.codex/config.toml` | [Codex](docs/user-guide/platforms/codex.md) |
 | **Antigravity** | `.agents/mcp_config.json`, an `AGENTS.md` block | [Antigravity](docs/user-guide/platforms/antigravity.md) |
 | Windsurf, Claude Desktop, Zed, Cline, … | `codebase-index config` prints the JSON to paste | [Other clients](docs/user-guide/platforms/other-clients.md) |
 
 `setup` merges into existing files (your other MCP servers and your own instructions are kept), is safe to
-re-run, and `--dry-run` shows what it would do.
+re-run, and `--dry-run` shows what it would do. The portable `.mcp.json` entry can be shared by Claude Code
+and VS Code/Copilot; generated entries contain local absolute paths, so review them before committing.
 
 ---
 
@@ -87,8 +99,8 @@ Everything is indexed in **[docs/README.md](docs/README.md)**.
 | Tool | Answers |
 |---|---|
 | `repo_map` | Main folders and the most important files |
-| `search_symbol` | Where is X defined? |
-| `get_file_summary` / `get_exports` | A file's outline / its public API, with line numbers |
+| `search_symbol` | Where is X defined, including YAML/tsconfig keys? |
+| `get_file_summary` / `get_exports` | A file's outline / its public API or top-level config keys, with line numbers |
 | `read_symbol_source` | Exact code of one function or class (huge ones come back folded) |
 | `find_callers` / `find_callees` | Who calls X (and what breaks) / what X calls |
 | `who_imports` | Which files depend on this file |
@@ -104,12 +116,15 @@ Examples of real output and every argument: [Tools reference](docs/reference/too
 - Only static imports are resolved; computed `import()` strings are not.
 - The index knows structure, not runtime behaviour or types.
 - Unsaved editor changes are invisible: save before asking.
-- Markdown, SQL, YAML and JSON are not indexed; assistants read them normally.
+- Markdown, SQL and arbitrary JSON are not indexed; YAML and TypeScript configuration files are indexed as
+  searchable key paths. Safe scalar values remain useful in the local index, while credential-looking values
+  are stored as `<redacted>`; exact local values can still be read through the indexed-file source tools.
 
 ## Privacy
 
 Everything except the optional `summarize_file` runs locally with no network calls. `summarize_file` sends
-one file to the provider whose API key you set; leave the keys empty to stay fully offline.
+one file to the provider whose API key you set, after field-aware redaction; leave the keys empty or set
+`CODEBASE_OFFLINE=1` to stay fully offline.
 
 ## Contributing and license
 

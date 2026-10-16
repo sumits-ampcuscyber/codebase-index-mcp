@@ -1,4 +1,4 @@
-"""End-to-end tests on a small synthetic repo (Python + TS/TSX + Express).
+"""End-to-end tests on a small synthetic repo (Python + TS/TSX + YAML/config + Express).
 
 Run:  python -m unittest discover -s tests -v
 """
@@ -64,6 +64,23 @@ FILES = {
           "$schema": "https://json.schemastore.org/tsconfig",
           "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["./src/*"] }, },
         }
+        ''',
+    "deploy/app.yaml": '''\
+        apiVersion: v1
+        kind: Deployment
+        metadata:
+          name: demo
+          labels:
+            app: demo
+        spec:
+          replicas: 2
+          password: supersecret-yaml-password
+          api_key: unquoted-yaml-key
+          template:
+            spec:
+              containers:
+                - name: api
+                  image: example/api:latest
         ''',
     "web/src/lib/api.ts": '''\
         /** API client helpers. */
@@ -134,7 +151,26 @@ class IndexTest(unittest.TestCase):
 
     # ---- parser
     def test_all_files_indexed(self):
-        self.assertEqual(self.stats["reindexed"], 8)
+        self.assertEqual(self.stats["reindexed"], len(FILES))
+
+    def test_yaml_and_typescript_config_keys(self):
+        self.assertEqual(config.language_for_path("infra/config.yml"), "yaml")
+        self.assertEqual(config.language_for_path("tsconfig.base.json"), "typescript-config")
+        self.assertEqual(config.language_for_path("jsconfig.json"), "typescript-config")
+        self.assertEqual(self.con.execute(
+            "SELECT lang FROM files WHERE path='deploy/app.yaml'").fetchone()["lang"], "yaml")
+        self.assertEqual(self.con.execute(
+            "SELECT lang FROM files WHERE path='web/tsconfig.json'").fetchone()["lang"], "typescript-config")
+        self.assertEqual(self.sym("replicas", "app.yaml")["parent"], "spec")
+        self.assertEqual(self.sym("metadata", "app.yaml")["kind"], "key")
+        self.assertEqual(self.sym("compilerOptions", "tsconfig")["kind"], "key")
+        signatures = "\n".join(r["signature"] or "" for r in self.con.execute(
+            "SELECT signature FROM symbols WHERE file='deploy/app.yaml'"))
+        self.assertNotIn("supersecret-yaml-password", signatures)
+        self.assertNotIn("unquoted-yaml-key", signatures)
+        self.assertIn("<redacted>", signatures.lower())
+        self.assertIn("replicas", queries.get_file_summary("deploy/app.yaml"))
+        self.assertIn("compilerOptions", queries.get_file_summary("tsconfig.json"))
 
     def test_nested_symbols(self):
         self.assertEqual(self.sym("_validate")["parent"], "UserService.save")

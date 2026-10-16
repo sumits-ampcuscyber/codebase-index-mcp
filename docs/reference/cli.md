@@ -23,6 +23,7 @@ Run any command with `--help` for its options.
 | `--name <name>` | MCP server name (default `codebase-index-<repo>`) |
 | `--model <id>` | Subagent model. Cursor: a model id (default `grok-4.7`). Claude Code: `haiku` (default), `sonnet`, `opus`, `inherit` |
 | `--no-subagent` | Do not install the `codebase-explorer` subagent |
+| `--codex-scope command\|project` | Codex: print a registration command (default), or write a marked trusted-project `.codex/config.toml` block |
 | `--dry-run` | Show what would be written, change nothing |
 
 ## Query (same answers the assistant gets)

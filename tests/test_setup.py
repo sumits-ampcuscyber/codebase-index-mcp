@@ -64,12 +64,32 @@ class SetupTest(unittest.TestCase):
         self.assertIn("model: haiku", agent)
         self.assertNotIn("{{MODEL}}", agent)
 
-    def test_vscode_uses_servers_key(self):
+    def test_vscode_uses_portable_mcp_format(self):
         run_setup(args("vscode", self.ws))
-        data = json.loads((self.ws / ".vscode" / "mcp.json").read_text())
-        self.assertIn("codebase-index-demo", data["servers"])
-        self.assertNotIn("mcpServers", data)
+        data = json.loads((self.ws / ".mcp.json").read_text())
+        self.assertIn("codebase-index-demo", data["mcpServers"])
+        self.assertNotIn("servers", data)
         self.assertTrue((self.ws / ".github" / "copilot-instructions.md").exists())
+
+    def test_vscode_preserves_existing_legacy_format(self):
+        legacy = self.ws / ".vscode" / "mcp.json"
+        legacy.parent.mkdir()
+        legacy.write_text(json.dumps({"servers": {"other": {"command": "x"}}}))
+        run_setup(args("vscode", self.ws))
+        data = json.loads(legacy.read_text())
+        self.assertIn("other", data["servers"])
+        self.assertIn("codebase-index-demo", data["servers"])
+        self.assertFalse((self.ws / ".mcp.json").exists())
+
+    def test_codex_project_writes_marked_config(self):
+        run_setup(args("codex", self.ws, codex_scope="project"))
+        cfg = self.ws / ".codex" / "config.toml"
+        text = cfg.read_text()
+        self.assertIn("[mcp_servers.codebase-index-demo]", text)
+        self.assertIn("codebase_index.server", text)
+        first = text
+        run_setup(args("codex", self.ws, codex_scope="project"))
+        self.assertEqual(first, cfg.read_text())
 
     def test_codex_writes_agents_md_only(self):
         run_setup(args("codex", self.ws))
@@ -111,7 +131,8 @@ class TemplateTest(unittest.TestCase):
 
     def test_cli_parses_every_command(self):
         p = build_parser()
-        for argv in (["index"], ["stats"], ["map"], ["search", "x"], ["setup", "cursor"], ["doctor"],
+        for argv in (["index"], ["stats"], ["map"], ["search", "x"], ["setup", "cursor"],
+                     ["setup", "codex", "--codex-scope", "project"], ["doctor"],
                      ["bench"], ["hooks", "--uninstall"], ["config"], ["callers", "f", "--depth", "2"]):
             p.parse_args(argv)
 

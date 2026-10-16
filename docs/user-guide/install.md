@@ -41,7 +41,9 @@ Python. If you later delete or move the environment, re-run `setup`.
 ```bash
 git clone https://github.com/sumits-ampcuscyber/codebase-index-mcp.git
 cd codebase-index-mcp
-python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+# macOS/Linux
+python3 -m venv .venv && source .venv/bin/activate
+# Windows PowerShell: py -3 -m venv .venv; .\.venv\Scripts\Activate.ps1
 pip install -e ".[anthropic]"                          # drop the extra if you use Gemini or no key
 ```
 
@@ -72,6 +74,7 @@ pipx uninstall codebase-index-mcp
 ```
 
 The index lives in `<your-repo>/.codebase-index/` (it git-ignores itself); delete that folder to remove it.
-Generated client files are plain files: delete `.cursor/mcp.json` entries, the
+Generated client files are plain files: delete `.cursor/mcp.json` and `.mcp.json` entries, the
 `<!-- codebase-index:start -->` … `<!-- codebase-index:end -->` block in `CLAUDE.md` / `AGENTS.md` /
-`.github/copilot-instructions.md`, and the `codebase-explorer.md` agent files.
+`.github/copilot-instructions.md`, the marked block in `.codex/config.toml`, and the
+`codebase-explorer.md` agent files.
